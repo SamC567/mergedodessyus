@@ -296,6 +296,14 @@ class ChatProcessor:
         preface = []
         rag_sources = []
 
+        # Never hand saved memories or personal documents to a cloud model.
+        if use_memory or use_rag:
+            from src.cloud_privacy import foreground_route_is_cloud
+            if foreground_route_is_cloud(getattr(session, "endpoint_url", None), owner):
+                logger.info("[cloud-privacy] cloud route: withholding memory and RAG context")
+                use_memory = False
+                use_rag = False
+
         # Add preset system prompt if specified
         if preset_system_prompt:
             preface.append({

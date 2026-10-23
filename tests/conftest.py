@@ -61,6 +61,11 @@ if "src.database" not in sys.modules:
 # collection, which breaks session import in subsequent tests).
 import core.models  # noqa: E402
 
+# The cloud privacy guard withholds private-data tools from non-local
+# endpoints; most tests drive tools through cloud-looking URLs, so it is off
+# here and test_cloud_privacy.py turns it back on.
+os.environ["ODYSSEUS_CLOUD_PRIVACY_GUARD"] = "0"
+
 def pytest_configure(config):
     """Register the dynamic taxonomy ``sub_*`` markers before collection.
 

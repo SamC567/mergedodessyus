@@ -277,6 +277,10 @@ async def auto_name_session(session_manager, sess):
         t_url, t_model, t_headers = resolve_task_endpoint(
             sess.endpoint_url, sess.model, sess.headers, owner=owner
         )
+        from src.cloud_privacy import is_cloud_url
+        if is_cloud_url(t_url) and not is_cloud_url(sess.endpoint_url):
+            logger.info("[cloud-privacy] skipping auto-name: task model is cloud, chat is local")
+            return
         if not t_model:
             logger.debug("[auto-name] No model provided, skipping")
             return
@@ -1195,13 +1199,18 @@ def run_post_response_tasks(
     if allow_background_extraction and not incognito and not compare_mode and _should_extract and uprefs.get("auto_memory", True):
         from services.memory.memory_extractor import extract_and_store
         from src.task_endpoint import resolve_task_endpoint
+        from src.cloud_privacy import is_cloud_url
         t_url, t_model, t_headers = resolve_task_endpoint(
             sess.endpoint_url, sess.model, sess.headers, owner=owner,
         )
-        _extraction_jobs.append(("memory", extract_and_store(
-            sess, memory_manager, memory_vector,
-            t_url, t_model, t_headers,
-        )))
+        # Don't ship a local chat's transcript to a cloud task model.
+        if is_cloud_url(t_url) and not is_cloud_url(sess.endpoint_url):
+            logger.info("[cloud-privacy] skipping memory extraction: task model is cloud, chat is local")
+        else:
+            _extraction_jobs.append(("memory", extract_and_store(
+                sess, memory_manager, memory_vector,
+                t_url, t_model, t_headers,
+            )))
 
     # Skill extraction from complex agent runs. Only when the user actually
     # chose agent mode — not a chat we auto-escalated for a notes/calendar
@@ -1233,16 +1242,20 @@ def run_post_response_tasks(
         else:
             from services.memory.skill_extractor import maybe_extract_skill
             from src.task_endpoint import resolve_task_endpoint
+            from src.cloud_privacy import is_cloud_url
             s_url, s_model, s_headers = resolve_task_endpoint(
                 sess.endpoint_url, sess.model, sess.headers, owner=owner,
             )
-            logger.debug("[skill-extract] dispatching extractor (model=%s)", s_model)
-            _extraction_jobs.append(("skill", maybe_extract_skill(
-                sess, skills_manager,
-                s_url, s_model, s_headers,
-                agent_rounds, agent_tool_calls,
-                owner=owner,
-            )))
+            if is_cloud_url(s_url) and not is_cloud_url(sess.endpoint_url):
+                logger.info("[cloud-privacy] skipping skill extraction: task model is cloud, chat is local")
+            else:
+                logger.debug("[skill-extract] dispatching extractor (model=%s)", s_model)
+                _extraction_jobs.append(("skill", maybe_extract_skill(
+                    sess, skills_manager,
+                    s_url, s_model, s_headers,
+                    agent_rounds, agent_tool_calls,
+                    owner=owner,
+                )))
 
     if _extraction_jobs:
         _spawn_bg(_run_extraction_jobs_sequentially(session_id, _extraction_jobs))

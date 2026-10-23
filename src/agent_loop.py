@@ -38,6 +38,7 @@ from src.tool_security import (
     plan_mode_disabled_tools,
 )
 from src.tool_policy import GUIDE_ONLY_DIRECTIVE, WEB_TOOL_NAMES, ToolPolicy
+from src.cloud_privacy import PRIVATE_DATA_TOOL_NAMES, route_is_cloud
 from src.tool_capabilities import (
     ResultIntegrity,
     ToolRunSecurityContext,
@@ -3576,6 +3577,14 @@ async def stream_agent_loop(
         # MCP tools are namespaced dynamically, so hide all MCP schemas for
         # public/non-admin users rather than trying to enumerate every tool.
         mcp_mgr = None
+    # A cloud model (selected or fallback) must not pull private data via
+    # tools. MCP servers can expose files/mail too, so drop them as well.
+    _cloud_private_tools: frozenset = frozenset()
+    if route_is_cloud(endpoint_url, fallbacks):
+        _cloud_private_tools = PRIVATE_DATA_TOOL_NAMES
+        disabled_tools.update(_cloud_private_tools)
+        mcp_mgr = None
+        logger.info("[cloud-privacy] cloud route: private-data tools and MCP disabled")
 
     if plan_mode:
         # Plan mode: investigate read-only, propose a plan, don't execute. The
@@ -4228,7 +4237,7 @@ async def stream_agent_loop(
     elif _ody_notes_finetune_mode and _relevant_tools is not None:
         disabled_tools.difference_update({
             "manage_notes", "manage_calendar", "manage_tasks",
-        })
+        } - _cloud_private_tools)
         logger.info("[agent-intent] odysseus notes finetune tool clamp=%s", sorted(_relevant_tools))
     elif _ody_general_no_tool_mode:
         try:
@@ -5225,7 +5234,7 @@ async def stream_agent_loop(
                                 # blocklist, or its tool calls are rejected.
                                 disabled_tools.difference_update({
                                     "manage_notes", "manage_calendar", "manage_tasks",
-                                })
+                                } - _cloud_private_tools)
                             data["pinned_for_run"] = True
                         if _apply_candidate_compaction(candidate_index):
                             yield f'data: {json.dumps({"type": "compacted", "context_length": _last_route_context_length})}\n\n'
@@ -5724,6 +5733,7 @@ async def stream_agent_loop(
             _ody_clamped_tool_allowed = (
                 _ody_notes_finetune_mode
                 and block.tool_type in {"manage_notes", "manage_calendar", "manage_tasks"}
+                and block.tool_type not in _cloud_private_tools
             )
             policy_names = email_tool_policy_names(block.tool_type)
             blocked_by_tool_policy = bool(
