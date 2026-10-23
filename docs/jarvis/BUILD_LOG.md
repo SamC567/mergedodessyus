@@ -87,3 +87,16 @@ Branches: `local/llama-chroma-ddg-setup` (local stack), `feature/jarvis-quest-lo
 - Not verified live: complete via chat (would award XP for unfinished work);
   covered by unit tests only.
 - Commit: `6692a6dd`.
+
+### T4. Memory searches without approval (Sam's decision, 2026-10-23)
+- `manage_memory` list/search added to the post-external low-risk set in
+  `src/tool_capabilities.py`. add/edit/delete stay gated.
+- Tests: gate test extended (search/list pass; add/edit/delete blocked; notes
+  list still blocked). Quest suite 38 passed.
+- Regression: 116 files (previous set + every test mentioning manage_memory)
+  -> 43 failed / 1,411 passed; failure set identical to baseline.
+- Live (Qwen, Chat mode): same PC-upgrade request ran with no prompts; Jarvis
+  read the board first, recognised the existing plan, created no duplicates,
+  flagged the overlapping Build Jarvis quests. A "search your memory" request
+  was answered from auto-recalled memories without calling the tool, so the
+  no-prompt memory search path was NOT exercised live (unit-tested only).

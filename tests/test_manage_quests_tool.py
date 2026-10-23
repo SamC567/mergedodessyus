@@ -176,7 +176,14 @@ def test_post_external_gate_allows_only_quest_reads_and_creates():
                  {"action": "explode"}):
         assert not ctx.decision_for("manage_quests", json.dumps(args)).allowed, args
     assert not ctx.decision_for("manage_notes", json.dumps({"action": "add", "title": "x"})).allowed
+    assert not ctx.decision_for("manage_notes", json.dumps({"action": "list"})).allowed
+    # Memory: reads pass (user's choice), every write stays gated.
+    assert ctx.decision_for("manage_memory", "search\nPC hardware specs").allowed
+    assert ctx.decision_for("manage_memory", json.dumps({"action": "search", "query": "gpu"})).allowed
+    assert ctx.decision_for("manage_memory", "list").allowed
     assert not ctx.decision_for("manage_memory", "add\nfact").allowed
+    assert not ctx.decision_for("manage_memory", json.dumps({"action": "edit", "id": "x"})).allowed
+    assert not ctx.decision_for("manage_memory", "delete\nabc").allowed
     # Without untrusted context nothing changes.
     assert ToolRunSecurityContext().decision_for("manage_quests", json.dumps({"action": "drop"})).allowed
 

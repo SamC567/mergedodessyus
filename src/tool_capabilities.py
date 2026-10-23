@@ -599,11 +599,16 @@ POST_EXTERNAL_BLOCKED_EFFECTS = frozenset(
 #   no existing row changes, no XP is earned, and each row is visible in the
 #   Quest Log and can be dropped. Injected text can at worst add a junk quest.
 # State changes (complete, drop, reopen, update, update_campaign) stay gated.
+# - manage_memory list/search: the user chose (2026-10-23) to let Jarvis read
+#   their saved memories without a prompt. Same reasoning as quest reads: the
+#   facts are already auto-injected into most chats, and egress stays gated.
+#   add/edit/delete remain gated.
 _POST_EXTERNAL_LOW_RISK_ACTIONS: Mapping[str, frozenset[str]] = MappingProxyType(
     {
         "manage_quests": frozenset(
             {"board", "next", "history", "plan", "add_quest", "add_campaign"}
         ),
+        "manage_memory": frozenset({"list", "search"}),
     }
 )
 
