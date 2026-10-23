@@ -27,7 +27,8 @@ CAMPAIGN_STATUSES = ("active", "paused", "done")
 
 # Fields a caller may set when creating/updating a quest.
 QUEST_FIELDS = ("title", "campaign_id", "notes", "impact", "effort", "due_date",
-                "depends_on", "skill", "is_boss")
+                "depends_on", "skill", "is_boss", "est_minutes", "est_cost")
+PROGRESS_MAX = 1000
 
 
 class QuestError(Exception):
@@ -53,6 +54,30 @@ def clean_text(value: Optional[str], limit: int) -> Optional[str]:
         return None
     text = str(value).strip()
     return text[:limit] if text else None
+
+
+def clean_minutes(value: Any) -> Optional[int]:
+    if value in (None, ""):
+        return None
+    try:
+        minutes = int(round(float(value)))
+    except (TypeError, ValueError):
+        raise QuestError(422, "est_minutes must be a number of minutes")
+    if minutes < 0 or minutes > 60 * 24 * 30:
+        raise QuestError(422, "est_minutes is out of range")
+    return minutes or None
+
+
+def clean_cost(value: Any) -> Optional[float]:
+    if value in (None, ""):
+        return None
+    try:
+        cost = round(float(value), 2)
+    except (TypeError, ValueError):
+        raise QuestError(422, "est_cost must be a number")
+    if cost < 0:
+        raise QuestError(422, "est_cost cannot be negative")
+    return cost
 
 
 def clean_due(value: Optional[str]) -> Optional[str]:
@@ -90,6 +115,7 @@ def view_of(quest: Quest, order: int = 0) -> engine.QuestView:
         is_boss=bool(quest.is_boss),
         campaign_id=quest.campaign_id,
         created_order=order,
+        est_minutes=quest.est_minutes,
     )
 
 
@@ -110,6 +136,9 @@ def quest_dict(quest: Quest, views: Dict[str, engine.QuestView]) -> Dict[str, An
         "is_boss": bool(quest.is_boss),
         "xp_value": engine.xp_for(quest.effort, bool(quest.is_boss)),
         "outcome": quest.outcome,
+        "est_minutes": quest.est_minutes,
+        "est_cost": quest.est_cost,
+        "agent_session_id": quest.agent_session_id,
         "completed_at": quest.completed_at.isoformat() if quest.completed_at else None,
         "created_at": quest.created_at.isoformat() if quest.created_at else None,
     }
@@ -322,6 +351,8 @@ def create_quest(db, owner, fields: Dict[str, Any]) -> Quest:
         depends_on=json.dumps(deps) if deps else None,
         skill=clean_text(fields.get("skill"), SKILL_MAX),
         is_boss=bool(fields.get("is_boss", False)),
+        est_minutes=clean_minutes(fields.get("est_minutes")),
+        est_cost=clean_cost(fields.get("est_cost")),
     )
     db.add(quest)
     log_event(db, owner, quest, "created")
@@ -357,6 +388,31 @@ def update_quest(db, owner, quest_id: str, fields: Dict[str, Any]) -> Quest:
         if quest.status == "done":
             raise QuestError(409, "Reopen the quest before changing boss status")
         quest.is_boss = bool(fields["is_boss"])
+    if "est_minutes" in fields:
+        quest.est_minutes = clean_minutes(fields["est_minutes"])
+    if "est_cost" in fields:
+        quest.est_cost = clean_cost(fields["est_cost"])
+    db.flush()
+    return quest
+
+
+def log_progress(db, owner, quest_id: str, note: Optional[str]) -> Quest:
+    """Record a progress note (no XP). Used by Jarvis while working on a quest."""
+    note = clean_text(note, PROGRESS_MAX)
+    if not note:
+        raise QuestError(422, "Progress note is required")
+    quest = get_quest(db, owner, quest_id)
+    if quest.status not in engine.OPEN_STATUSES:
+        raise QuestError(409, f"Quest is {quest.status}")
+    log_event(db, owner, quest, "progress", detail=note)
+    db.flush()
+    return quest
+
+
+def link_agent_session(db, owner, quest_id: str, session_id: Optional[str]) -> Quest:
+    quest = get_quest(db, owner, quest_id)
+    quest.agent_session_id = clean_text(session_id, 100)
+    log_event(db, owner, quest, "delegated", detail="Jarvis started working on this")
     db.flush()
     return quest
 

@@ -720,6 +720,9 @@ async def do_manage_settings(content: str, owner: Optional[str] = None) -> Dict:
                 "notes": ["manage_notes"],
                 "quests": ["manage_quests"],
                 "quest log": ["manage_quests"],
+                "ledger": ["manage_ledger"],
+                "life ledger": ["manage_ledger"],
+                "system status": ["system_status"],
                 "calendar": ["manage_calendar"],
                 # The full built-in email tool set, in BOTH spellings: the
                 # qualified mcp__email__* names drive MCP schema hiding, the

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Command Centre — Jarvis</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ff41' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/jarvis.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="back" href="/" title="Back to chat">◂ Odysseus</a>
+    <h1>Jarvis</h1>
+    <nav class="nav" aria-label="Jarvis pages">
+      <a href="/jarvis" class="active">Command centre</a>
+      <a href="/quests">Quests</a>
+      <a href="/ledger">Ledger <span class="pill" id="ledger-pill" hidden></span></a>
+      <a href="/actions">History &amp; permissions</a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="level" aria-label="Level and experience">
+      <span class="badge" id="lvl">Lv 1</span>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="xp-bar"><span></span></div>
+      <span class="xp-text" id="xp-text">0 XP</span>
+    </div>
+  </header>
+
+  <div class="cols">
+    <div>
+      <section>
+        <h2>Your campaign</h2>
+        <div class="panel recommend" id="recommend"><span class="empty">Loading…</span></div>
+      </section>
+
+      <section>
+        <h2>Today's missions <span class="muted small" id="today-date"></span></h2>
+        <div class="panel">
+          <div class="row small" style="margin-bottom:10px">
+            <label class="inline">Energy
+              <select id="energy">
+                <option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option>
+              </select>
+            </label>
+            <label class="inline">Time today
+              <input id="minutes" type="number" min="0" max="960" step="15" placeholder="minutes" style="width:96px">
+            </label>
+            <button id="replan">Re-plan my day</button>
+            <span class="muted" id="planned"></span>
+          </div>
+          <ol class="list" id="missions"></ol>
+        </div>
+      </section>
+
+      <section>
+        <h2>Needs attention</h2>
+        <div class="panel" id="attention"></div>
+      </section>
+
+      <section>
+        <h2>Quick capture</h2>
+        <div class="panel">
+          <form id="capture" class="row">
+            <input id="capture-text" class="grow" maxlength="200" placeholder="An idea, a task, a decision…" autocomplete="off" aria-label="Quick capture">
+            <button type="submit" data-kind="quest">Add as quest</button>
+            <button type="button" id="capture-ledger" title="Goes to the Review Inbox">Remember</button>
+            <button type="button" id="capture-ask" class="primary" title="Jarvis works on it in a new chat">Ask Jarvis</button>
+          </form>
+          <label class="inline small" style="margin-top:8px">
+            <input type="checkbox" id="allow-web"> Let Jarvis use web search when working on tasks
+          </label>
+        </div>
+      </section>
+    </div>
+
+    <div>
+      <section>
+        <h2>System <button class="ghost small" id="health-refresh" title="Refresh">↻</button></h2>
+        <div class="panel small" id="health"><span class="empty">Checking…</span></div>
+      </section>
+
+      <section>
+        <h2>Resources &amp; budget</h2>
+        <div class="panel small" id="resources"></div>
+        <details class="panel small" style="margin-top:8px">
+          <summary>Add a resource</summary>
+          <form id="resource-form" class="row" style="margin-top:8px">
+            <select name="kind" aria-label="Kind">
+              <option value="budget">Budget</option><option value="savings">Savings</option>
+              <option value="time">Weekly time</option><option value="equipment">Equipment</option>
+            </select>
+            <input name="name" placeholder="Name" required maxlength="120" style="flex:1;min-width:120px">
+            <input name="amount" type="number" min="0" step="any" placeholder="Amount / hours" style="width:120px">
+            <select name="campaign_id" aria-label="Campaign"></select>
+            <button>Add</button>
+          </form>
+        </details>
+      </section>
+
+      <section>
+        <h2>Recent actions <a class="small muted" href="/actions">all</a></h2>
+        <div class="panel small" id="actions"></div>
+      </section>
+    </div>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="/static/js/jarvis.js"></script>
+</body>
+</html>

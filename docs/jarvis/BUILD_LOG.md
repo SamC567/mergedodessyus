@@ -107,3 +107,18 @@ Branches: `local/llama-chroma-ddg-setup` (local stack), `feature/jarvis-quest-lo
   is the public upstream odysseus-dev/odysseus; awaiting a private repo URL.
 - Checks on dev: quest + cloud-privacy tests 48 passed; app /quests 302 (login
   redirect), llama-server n_ctx 16384, Chroma heartbeat 200.
+
+### T6. Command Centre, Life Ledger, resources, action history, health, permissions
+- New: /jarvis (missions by time/energy, recommendation, Ask Jarvis executor,
+  quick capture, resources/budget, system health, recent actions), /ledger
+  (review inbox: approve/reject/edit/merge/correct; Jarvis can only propose),
+  /actions (append-only tool-call log + approval policy + tool toggles).
+- Tools: manage_ledger (propose/search), system_status; manage_quests gains
+  today and log_progress. Tables: daily_plans, ledger_entries, life_resources,
+  action_log; quest columns est_minutes/est_cost/agent_session_id.
+- DB backed up before migration: data/app.db.bak-20261023-2308; 9 quests kept.
+- Tests: Jarvis + quest suites 63 passed.
+- Live: pages render with real data (desktop and 375px); capture -> ledger ->
+  reject works; chat "status report" ran system_status with no prompt.
+- NOT done: full regression rerun; day-plan chat result not checked; voice
+  (local engines not installed); nothing pushed (only remote is public upstream).

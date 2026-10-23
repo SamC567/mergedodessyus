@@ -81,6 +81,7 @@ _register(
         "list_models",
         "list_serve_presets",
         "list_served_models",
+        "system_status",
     },
     ToolEffect.READ_PRIVATE,
     # These readers return provider-controlled model identifiers or durable
@@ -144,6 +145,7 @@ _register(
         "manage_calendar",
         "manage_contact",
         "manage_documents",
+        "manage_ledger",
         "manage_memory",
         "manage_notes",
         "manage_quests",
@@ -320,7 +322,8 @@ _PRIVATE_ACTION_READS: Mapping[str, frozenset[str]] = MappingProxyType(
         "manage_documents": frozenset({"list", "read", "view", "open", "get"}),
         "manage_memory": frozenset({"list", "search"}),
         "manage_notes": frozenset({"list", "search", "find", "view"}),
-        "manage_quests": frozenset({"board", "next", "history"}),
+        "manage_quests": frozenset({"board", "next", "history", "today"}),
+        "manage_ledger": frozenset({"search"}),
         "manage_research": frozenset({"list", "read", "open", "view", "get"}),
         "manage_session": frozenset({"list", "switch", "open", "select", "view"}),
         "manage_skills": frozenset({"list", "index", "view", "view_ref", "search"}),
@@ -339,8 +342,9 @@ _PRIVATE_ACTION_WRITES: Mapping[str, frozenset[str]] = MappingProxyType(
         "manage_notes": frozenset({"add", "update", "delete", "toggle_item"}),
         "manage_quests": frozenset({
             "plan", "add_quest", "add_campaign", "update", "start",
-            "complete", "drop", "reopen", "update_campaign",
+            "complete", "drop", "reopen", "update_campaign", "log_progress",
         }),
+        "manage_ledger": frozenset({"propose"}),
         "manage_research": frozenset({"delete"}),
         "manage_session": frozenset(
             {
@@ -384,6 +388,7 @@ _ACTION_DEFAULTS: Mapping[str, str] = MappingProxyType(
         "manage_calendar": "list_events",
         "manage_documents": "list",
         "manage_quests": "board",
+        "manage_ledger": "search",
         "manage_research": "list",
         "manage_tasks": "list",
     }
@@ -425,6 +430,18 @@ _ACTION_ALIASES: Mapping[str, Mapping[str, str]] = MappingProxyType(
                 "begin": "start", "done": "complete", "finish": "complete",
                 "abandon": "drop", "cancel": "drop", "undo": "reopen",
                 "edit_campaign": "update_campaign",
+                "missions": "today", "daily": "today", "plan_today": "today",
+                "progress": "log_progress", "note": "log_progress",
+                "report_progress": "log_progress",
+            }
+        ),
+        # Mirrors src/tools/jarvis_tools.py::_LEDGER_ALIASES.
+        "manage_ledger": MappingProxyType(
+            {
+                "add": "propose", "remember": "propose", "save": "propose",
+                "record": "propose", "suggest": "propose", "create": "propose",
+                "find": "search", "recall": "search", "lookup": "search",
+                "query": "search", "list": "search",
             }
         ),
     }
@@ -606,9 +623,15 @@ POST_EXTERNAL_BLOCKED_EFFECTS = frozenset(
 _POST_EXTERNAL_LOW_RISK_ACTIONS: Mapping[str, frozenset[str]] = MappingProxyType(
     {
         "manage_quests": frozenset(
-            {"board", "next", "history", "plan", "add_quest", "add_campaign"}
+            {"board", "next", "history", "today", "plan", "add_quest", "add_campaign",
+             "log_progress"}
         ),
         "manage_memory": frozenset({"list", "search"}),
+        # Life Ledger: search returns approved entries; propose only creates a
+        # *pending* candidate that the user must approve in the Review Inbox.
+        "manage_ledger": frozenset({"search", "propose"}),
+        # Read-only health report (no arguments, so "*" = any call).
+        "system_status": frozenset({"*"}),
     }
 )
 
@@ -619,6 +642,8 @@ def is_post_external_low_risk(tool_name: Any, content: Any) -> bool:
     allowed = _POST_EXTERNAL_LOW_RISK_ACTIONS.get(tool_name)
     if not allowed:
         return False
+    if "*" in allowed:
+        return True
     return _action_from_content(tool_name, content) in allowed
 
 

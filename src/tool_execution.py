@@ -822,6 +822,61 @@ async def execute_tool_block(
     ) = _MISSING_TOOL_SECURITY_CONTEXT,
     exact_approval: Optional[ExactToolApproval] = None,
 ) -> Tuple[str, Dict]:
+    """Execute a tool block and append the outcome to the action history.
+
+    Every result - success, error, policy block - is recorded (redacted) by
+    services.jarvis.audit. Recording never raises into the tool run.
+    """
+    started = time.monotonic()
+    tool_name = getattr(block, "tool_type", None)
+    content = getattr(block, "content", None)
+    try:
+        output = await _execute_tool_block_checked(
+            block,
+            session_id=session_id,
+            disabled_tools=disabled_tools,
+            owner=owner,
+            progress_cb=progress_cb,
+            workspace=workspace,
+            tool_policy=tool_policy,
+            security_context=security_context,
+            exact_approval=exact_approval,
+        )
+    except Exception as e:
+        _record_action(owner, session_id, tool_name, content,
+                       {"error": f"{type(e).__name__}: {e}", "exit_code": 1}, started, exact_approval)
+        raise
+    _record_action(owner, session_id, tool_name, content, output[1], started, exact_approval)
+    return output
+
+
+def _record_action(owner, session_id, tool_name, content, result, started, exact_approval) -> None:
+    try:
+        from services.jarvis.audit import record_tool_call
+        record_tool_call(
+            owner, session_id, tool_name, content, result,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            approved=exact_approval is not None,
+        )
+    except Exception as e:  # auditing must never break tool execution
+        logger.warning("action log failed: %s", e)
+
+
+async def _execute_tool_block_checked(
+    block: Any,
+    session_id: Optional[str] = None,
+    disabled_tools: Optional[set] = None,
+    owner: Optional[str] = None,
+    progress_cb: Optional[Callable[[Dict], Awaitable[None]]] = None,
+    workspace: Optional[str] = None,
+    tool_policy: Optional[Any] = None,
+    security_context: (
+        ToolRunSecurityContext
+        | _NoToolSecurityContext
+        | _MissingToolSecurityContext
+    ) = _MISSING_TOOL_SECURITY_CONTEXT,
+    exact_approval: Optional[ExactToolApproval] = None,
+) -> Tuple[str, Dict]:
     """Execute a single tool block. Returns (description, result_dict).
 
     Thin wrapper: bind the per-turn workspace (so the path resolvers + subprocess
@@ -982,7 +1037,7 @@ async def _execute_tool_block_impl(
     from src.tool_implementations import (
         do_search_chats, do_manage_tasks,
         do_manage_skills, do_api_call, do_manage_notes,
-        do_manage_calendar, do_manage_quests,
+        do_manage_calendar, do_manage_quests, do_manage_ledger, do_system_status,
         do_download_model, do_serve_model, do_list_served_models, do_stop_served_model,
         do_tail_serve_output,
         do_list_downloads, do_cancel_download, do_search_hf_models, do_list_cached_models,
@@ -1193,6 +1248,12 @@ async def _execute_tool_block_impl(
     elif tool == "manage_quests":
         desc = "manage_quests"
         result = await do_manage_quests(content, owner=owner)
+    elif tool == "manage_ledger":
+        desc = "manage_ledger"
+        result = await do_manage_ledger(content, owner=owner)
+    elif tool == "system_status":
+        desc = "system_status"
+        result = await do_system_status(content, owner=owner)
     elif tool == "download_model":
         desc = "download_model"
         result = await do_download_model(content, owner=owner)

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>History &amp; Permissions — Jarvis</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ff41' stroke-width='2'%3E%3Cpath d='M12 8v4l3 3'/%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/jarvis.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="back" href="/" title="Back to chat">◂ Odysseus</a>
+    <h1>History &amp; permissions</h1>
+    <nav class="nav" aria-label="Jarvis pages">
+      <a href="/jarvis">Command centre</a>
+      <a href="/quests">Quests</a>
+      <a href="/ledger">Ledger</a>
+      <a href="/actions" class="active">History &amp; permissions</a>
+    </nav>
+  </header>
+
+  <section>
+    <h2>Needs your attention</h2>
+    <div class="panel small" id="attention"></div>
+  </section>
+
+  <section>
+    <h2>Action history
+      <span class="spacer"></span>
+      <select id="status" aria-label="Filter by result">
+        <option value="">All results</option><option value="ok">ok</option><option value="error">error</option>
+        <option value="blocked">blocked</option><option value="approval_required">approval required</option>
+      </select>
+      <select id="tool" aria-label="Filter by tool"><option value="">All tools</option></select>
+    </h2>
+    <div class="panel" style="overflow-x:auto">
+      <table>
+        <thead><tr><th>When</th><th>Tool</th><th>Result</th><th>Details</th><th>Time</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <p class="muted small">Append-only: there is no way (for you or Jarvis) to edit or delete these rows from the app.
+        Undo lives with each record type, e.g. reopen a quest or correct a ledger entry.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>When Jarvis must ask first</h2>
+    <div class="panel small" style="overflow-x:auto">
+      <p id="policy-summary" class="muted"></p>
+      <table>
+        <thead><tr><th>Tool</th><th>Runs without asking</th><th>Asks first (after untrusted content)</th></tr></thead>
+        <tbody id="policy"></tbody>
+      </table>
+      <p class="muted" id="privacy"></p>
+    </div>
+  </section>
+
+  <section>
+    <details class="panel small">
+      <summary>Turn tools on or off (admin)</summary>
+      <input id="tool-filter" placeholder="filter tools" aria-label="Filter tools" style="margin:8px 0">
+      <div id="toggles" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px"></div>
+      <div class="row" style="margin-top:8px"><button class="primary" id="save-tools">Save tool settings</button>
+        <span class="muted">Changes apply to new chats.</span></div>
+    </details>
+  </section>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="/static/js/actions.js"></script>
+</body>
+</html>

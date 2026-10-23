@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life Ledger — Jarvis</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ff41' stroke-width='2'%3E%3Cpath d='M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/jarvis.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="back" href="/" title="Back to chat">◂ Odysseus</a>
+    <h1>Life Ledger</h1>
+    <nav class="nav" aria-label="Jarvis pages">
+      <a href="/jarvis">Command centre</a>
+      <a href="/quests">Quests</a>
+      <a href="/ledger" class="active">Ledger <span class="pill" id="ledger-pill" hidden></span></a>
+      <a href="/actions">History &amp; permissions</a>
+    </nav>
+  </header>
+
+  <p class="muted small">Jarvis can only <em>propose</em> memories. Nothing here counts as true until you approve it.
+    Corrections keep the old version as history instead of overwriting it.</p>
+
+  <section>
+    <h2>Review inbox</h2>
+    <div id="inbox" class="grid"></div>
+  </section>
+
+  <section>
+    <h2>Add something Jarvis should know</h2>
+    <form id="add" class="panel row">
+      <select name="kind" aria-label="Kind">
+        <option value="decision">Decision</option><option value="preference">Preference</option>
+        <option value="fact">Fact</option><option value="reminder">Reminder</option>
+      </select>
+      <input name="text" class="grow" maxlength="1000" required placeholder="e.g. I'm buying a used RTX 3090, max €650" autocomplete="off">
+      <label class="inline small">Until <input name="relevant_until" type="date"></label>
+      <button class="primary">Save</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Approved <input id="filter" placeholder="filter" aria-label="Filter approved entries" style="margin-left:auto;text-transform:none;letter-spacing:0"></h2>
+    <div class="panel"><ul class="list" id="approved"></ul></div>
+  </section>
+
+  <section>
+    <details class="panel">
+      <summary>History (rejected and superseded)</summary>
+      <ul class="list small" id="history" style="margin-top:8px"></ul>
+    </details>
+  </section>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="/static/js/ledger.js"></script>
+</body>
+</html>

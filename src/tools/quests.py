@@ -25,6 +25,8 @@ _ACTION_ALIASES = {
     "begin": "start", "done": "complete", "finish": "complete",
     "abandon": "drop", "cancel": "drop", "undo": "reopen",
     "edit_campaign": "update_campaign", "log": "history",
+    "missions": "today", "daily": "today", "plan_today": "today",
+    "progress": "log_progress", "note": "log_progress", "report_progress": "log_progress",
 }
 
 _STATUS_MARK = {"todo": " ", "doing": "~", "done": "x", "dropped": "-"}
@@ -79,6 +81,10 @@ def _quest_fields(spec: Dict[str, Any]) -> Dict[str, Any]:
         out["due_date"] = _due(spec.get("due_date", spec.get("due")))
     if "is_boss" in spec or "boss" in spec:
         out["is_boss"] = bool(spec.get("is_boss", spec.get("boss")))
+    if "est_minutes" in spec or "minutes" in spec:
+        out["est_minutes"] = spec.get("est_minutes", spec.get("minutes"))
+    if "est_cost" in spec or "cost" in spec:
+        out["est_cost"] = spec.get("est_cost", spec.get("cost"))
     return out
 
 
@@ -164,6 +170,29 @@ async def do_manage_quests(content: Any, owner: Optional[str] = None) -> Dict:
 
         if action == "next":
             return {"results": _format_next(store.board(db, owner)), "exit_code": 0}
+
+        if action == "today":
+            from services.jarvis import today as today_svc
+            if args.get("energy") or args.get("minutes_available") is not None:
+                today_svc.plan_day(db, owner, energy=args.get("energy"),
+                                   minutes=args.get("minutes_available"))
+                db.commit()
+            t = today_svc.today_view(db, owner)
+            lines = [f"Today {t['date']} - energy {t['plan']['energy']}"
+                     + (f", {t['plan']['minutes_available']} min available" if t['plan']['minutes_available'] else "")
+                     + f", {t['plan']['minutes_planned']} min planned."]
+            if t["focus_campaign"]:
+                lines.append(f"Focus campaign: {t['focus_campaign']['title']}")
+            lines.append("Missions:" if t["missions"] else "Missions: none (no open, unblocked quests).")
+            for i, m in enumerate(t["missions"], 1):
+                lines.append(f"  {i}. [{m['state']}] {m['title']} [{m['id'][:8]}] ~{m['est_minutes_effective']} min")
+            for label, key in (("Overdue", "overdue"), ("Due soon", "due_soon")):
+                if t[key]:
+                    lines.append(f"{label}: " + "; ".join(f"{q['title']} ({q['due_date']})" for q in t[key]))
+            if t["blocked"]:
+                lines.append("Blocked: " + "; ".join(
+                    f"{q['title']} <- {', '.join(b['title'] for b in q['blocked_by'])}" for q in t["blocked"][:5]))
+            return {"results": "\n".join(lines), "exit_code": 0}
 
         if action == "history":
             events = store.history(db, owner, int(args.get("limit") or 15))
@@ -272,6 +301,12 @@ async def do_manage_quests(content: Any, owner: Optional[str] = None) -> Dict:
             return {"results": f"Completed '{quest.title}' (+{xp} XP). Now level {level['level']}, "
                                f"{level['xp']}/{level['next_level_xp']} XP.", "exit_code": 0}
 
+        if action == "log_progress":
+            quest = store.find_quest(db, owner, ref, include_finished=False)
+            store.log_progress(db, owner, quest.id, args.get("note") or args.get("progress") or args.get("outcome"))
+            db.commit()
+            return {"results": f"Logged progress on '{quest.title}'.", "exit_code": 0}
+
         if action == "drop":
             quest = store.drop_quest(db, owner, store.find_quest(db, owner, ref, include_finished=False).id)
             db.commit()
@@ -282,8 +317,8 @@ async def do_manage_quests(content: Any, owner: Optional[str] = None) -> Dict:
             db.commit()
             return {"results": f"Reopened '{quest.title}' (any XP it earned was reversed).", "exit_code": 0}
 
-        return {"error": f"Unknown action '{raw}'. Use board, next, plan, add_quest, add_campaign, "
-                         "update, start, complete, drop, reopen, update_campaign or history.",
+        return {"error": f"Unknown action '{raw}'. Use board, next, today, plan, add_quest, add_campaign, "
+                         "update, start, log_progress, complete, drop, reopen, update_campaign or history.",
                 "exit_code": 1}
     except QuestError as e:
         db.rollback()

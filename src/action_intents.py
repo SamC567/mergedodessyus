@@ -57,8 +57,19 @@ _QUEST_PATTERNS: tuple[tuple[str, str], ...] = (
     ("plan-it-out request", r"\b(?:plan|break|map)\s+(?:that|this|it|them|everything)\s+(?:out|down)\b|\bhelp\s+me\s+plan\b"),
     ("goal statement", r"\b(?:my\s+(?:main\s+|big\s+|next\s+)?goals?\s+(?:is|are|for)|i\s+want\s+to\s+(?:build|learn|get\s+better|become|start|finish|upgrade|save\s+up))\b"),
     ("progress report", r"\bi(?:'ve|\s+have)?\s+(?:just\s+)?(?:finished|completed)\b"),
+    ("daily plan request", r"\b(?:plan|organi[sz]e)\s+(?:my|the)\s+day\b|\bwhat(?:'s|\s+is)\s+on\s+(?:for\s+)?today\b|\btoday'?s\s+missions?\b"),
+    ("decision statement", r"\bi(?:'ve|\s+have)?\s+decided\b|\bfor\s+the\s+record\b|\bfrom\s+now\s+on\s+i\b"),
+    ("ledger mention", r"\b(?:life\s+)?ledger\b"),
 )
 _QUEST_RES: tuple[Pattern[str], ...] = tuple(re.compile(p, re.I) for _, p in _QUEST_PATTERNS)
+
+# System status questions that need the system_status tool.
+_STATUS_PATTERNS: tuple[tuple[str, str], ...] = (
+    ("status report request", r"\b(?:status\s+report|system\s+status|server\s+status|health\s+check)\b"),
+    ("server health question", r"\b(?:how(?:'s|\s+is)\s+the\s+(?:server|system|pc|model)|is\s+the\s+(?:model|server|llm)\s+(?:up|running|ok|working))\b"),
+    ("resource question", r"\bhow\s+much\s+(?:ram|memory|vram|disk|disk\s+space)\b.{0,30}\b(?:free|left|used|available)\b"),
+)
+_STATUS_RES: tuple[Pattern[str], ...] = tuple(re.compile(p, re.I) for _, p in _STATUS_PATTERNS)
 
 
 def is_quest_intent(text: str) -> bool:
@@ -66,6 +77,13 @@ def is_quest_intent(text: str) -> bool:
     if not text or _EXPLANATORY_PREFIX.search(text):
         return False
     return any(p.search(text) for p in _QUEST_RES)
+
+
+def is_status_intent(text: str) -> bool:
+    """True when a message asks about Jarvis's own system health."""
+    if not text or _EXPLANATORY_PREFIX.search(text):
+        return False
+    return any(p.search(text) for p in _STATUS_RES)
 
 
 _ROUTING_PATTERNS: tuple[tuple[str, str, Pattern[str]], ...] = tuple(
@@ -136,6 +154,7 @@ _ROUTING_PATTERNS: tuple[tuple[str, str, Pattern[str]], ...] = tuple(
         # workspace so "plan my project" reaches manage_quests, not the coding
         # workspace.
         *(("quests", reason, pattern) for reason, pattern in _QUEST_PATTERNS),
+        *(("status", reason, pattern) for reason, pattern in _STATUS_PATTERNS),
 
         # Workspace / coding-agent intent. These should promote to the agent
         # workspace with shell/file tools available, not the "light" typed-tool

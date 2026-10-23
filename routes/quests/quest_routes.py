@@ -48,6 +48,8 @@ class QuestCreate(BaseModel):
     depends_on: Optional[List[str]] = None
     skill: Optional[str] = None
     is_boss: bool = False
+    est_minutes: Optional[float] = None
+    est_cost: Optional[float] = None
 
 
 class QuestUpdate(BaseModel):
@@ -60,10 +62,20 @@ class QuestUpdate(BaseModel):
     depends_on: Optional[List[str]] = None
     skill: Optional[str] = None
     is_boss: Optional[bool] = None
+    est_minutes: Optional[float] = None
+    est_cost: Optional[float] = None
 
 
 class QuestComplete(BaseModel):
     outcome: str
+
+
+class QuestProgress(BaseModel):
+    note: str
+
+
+class QuestDelegate(BaseModel):
+    session_id: str
 
 
 def _fields(body: BaseModel, exclude_unset: bool = True) -> dict:
@@ -179,6 +191,23 @@ def setup_quest_routes():
         owner = _owner(request)
         with _session() as db:
             quest = store.reopen_quest(db, owner, quest_id)
+            db.commit()
+            return _quest_out(db, owner, quest)
+
+    @router.post("/{quest_id}/progress")
+    def quest_progress(request: Request, quest_id: str, body: QuestProgress):
+        owner = _owner(request)
+        with _session() as db:
+            quest = store.log_progress(db, owner, quest_id, body.note)
+            db.commit()
+            return _quest_out(db, owner, quest)
+
+    @router.post("/{quest_id}/delegate")
+    def delegate_quest(request: Request, quest_id: str, body: QuestDelegate):
+        """Link the chat session where Jarvis is working on this quest."""
+        owner = _owner(request)
+        with _session() as db:
+            quest = store.link_agent_session(db, owner, quest_id, body.session_id)
             db.commit()
             return _quest_out(db, owner, quest)
 

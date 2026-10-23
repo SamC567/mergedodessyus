@@ -1,5 +1,6 @@
 // Quest Log page — campaigns, quests, XP and "next up" recommendations.
 // ES6 module. All user text goes through textContent; nothing is parsed as HTML.
+import { askJarvis, questPrompt } from './jarvis-common.js';
 
 const API = '/api/quests';
 const STATUS_ICON = { todo: '○', doing: '◐', done: '●', dropped: '×' };
@@ -94,7 +95,18 @@ function questActions(q) {
     btns.push(h('button', { class: 'ghost', title: 'Start', onclick: () => act(api(`/${q.id}/start`, { method: 'POST' })) }, '▶'));
   }
   if ((q.status === 'todo' || q.status === 'doing') && !blocked) {
+    btns.push(h('button', { class: 'ghost', title: 'Ask Jarvis to work on this', onclick: async () => {
+      try {
+        const sid = await askJarvis(questPrompt(q, campaignName(q.campaign_id)), { questId: q.id, label: q.title });
+        toast('Jarvis is working on it. Open it from the chat list.');
+        await refresh();
+        return sid;
+      } catch (e) { toast(e.message, true); }
+    } }, '🤖'));
     btns.push(h('button', { class: 'ghost', title: `Complete (+${q.xp_value} XP)`, onclick: () => openComplete(q) }, '✓'));
+  }
+  if (q.agent_session_id) {
+    btns.push(h('a', { class: 'ghost', href: `/#${q.agent_session_id}`, title: 'Open Jarvis chat for this quest' }, '💬'));
   }
   if (q.status === 'todo' || q.status === 'doing') {
     btns.push(h('button', { class: 'ghost', title: 'Drop', onclick: () => {

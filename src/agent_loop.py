@@ -573,7 +573,14 @@ _DOMAIN_RULES = {
 - action=complete only when the user says it's done; `outcome` restates what they said actually changed. Never complete quests on your own judgement or to hand out XP.
 - Don't invent progress, deadlines or facts about the user. If a goal is too vague to break down, ask one short question instead.
 - Prefer drop (reversible); you cannot delete quests.
-- After a plan, reply with a short summary, not the whole tool output.""",
+- After a plan, reply with a short summary, not the whole tool output.
+- "What's on today / plan my day" -> action=today. If the user mentions their energy or how long they have, pass energy/minutes_available so missions are re-picked.
+- When asked to work on a quest, do the work with the tools you have, call action=log_progress with what you did or found, then tell the user what's left and ask them to confirm before anything is marked complete.
+- Decisions and lasting preferences about plans ("I've decided to buy a used 3090", "I want quests under 2 hours") -> `manage_ledger` action=propose (one clear statement, kind decision/preference, source_ref where it came from). It goes to Sam's Review Inbox; say so in one line. Identity facts like name or location stay in `manage_memory`. Don't propose passing remarks or things you inferred unless you mark kind=inference.
+- Use `manage_ledger` action=search when an earlier decision or preference would change your advice.""",
+    "status": """\
+## System status rules
+- "Status report" / "is the server up" / RAM, VRAM, disk questions -> call `system_status` and summarise in a few lines; flag anything marked as a problem.""",
     "notes_calendar_tasks": """\
 ## Notes/calendar/tasks rules
 - Notes/todos/reminders use `manage_notes`, not memory.
@@ -614,7 +621,8 @@ _DOMAIN_TOOL_MAP = {
     "email": {"list_email_accounts", "list_emails", "read_email", "scan_email_unsubscribes", "unsubscribe_email", "send_email", "reply_to_email", "bulk_email", "archive_email", "delete_email", "mark_email_read", "resolve_contact", "manage_contact"},
     "cookbook": {"download_model", "serve_model", "serve_preset", "list_serve_presets", "list_served_models", "stop_served_model", "tail_serve_output", "list_downloads", "cancel_download", "search_hf_models", "list_cached_models", "list_cookbook_servers", "adopt_served_model"},
     "notes_calendar_tasks": {"manage_notes", "manage_calendar", "manage_tasks"},
-    "quests": {"manage_quests"},
+    "quests": {"manage_quests", "manage_ledger"},
+    "status": {"system_status"},
     "ui": {"ui_control"},
     "sessions": {"create_session", "list_sessions", "manage_session", "send_to_session", "search_chats"},
     "files": {"bash", "python", "read_file", "write_file", "edit_file", "apply_patch", "todowrite", "grep", "glob", "ls", "get_workspace", "manage_bg_jobs"},
@@ -627,6 +635,16 @@ _WORKSPACE_TERMINUS_TOOLS = (
     _DOMAIN_TOOL_MAP["files"]
     | {"manage_skills", "ask_teacher", "web_search", "web_fetch", "ask_user", "update_plan"}
 )
+
+def _audit_pre_execution(owner, session_id, block, result) -> None:
+    """Record tool calls stopped before execution (policy block / approval prompt)."""
+    try:
+        from services.jarvis.audit import record_tool_call
+        record_tool_call(owner, session_id, getattr(block, "tool_type", None),
+                         getattr(block, "content", None), result)
+    except Exception as e:
+        logger.warning("action log (pre-execution) failed: %s", e)
+
 
 def _domain_rules_for_tools(tool_names: set) -> list[str]:
     names = set(tool_names or set())
@@ -1508,9 +1526,11 @@ def _classify_agent_request(messages: List[Dict], last_user: str) -> Dict[str, o
         domains.add("notes_calendar_tasks")
     if has(r"\b(calendar|event|meeting|appointment|schedule)\b"):
         domains.add("notes_calendar_tasks")
-    from src.action_intents import is_quest_intent
+    from src.action_intents import is_quest_intent, is_status_intent
     if is_quest_intent(retrieval_query) or has(r"\b(milestones?|roadmap|goals?|priorit\w*|next steps?)\b"):
         domains.add("quests")
+    if is_status_intent(retrieval_query):
+        domains.add("status")
     _code_write_intent = has(
         r"\b(?:python|javascript|typescript|java|c\+\+|cpp|c#|csharp|rust|go|golang|"
         r"ruby|php|swift|kotlin|bash|shell|html|css|sql)\b",
@@ -5782,6 +5802,7 @@ async def stream_agent_loop(
                     "Tool blocked before approval by current policy: %s",
                     block.tool_type,
                 )
+                _audit_pre_execution(owner, session_id, block, result)
             elif not security_decision.allowed:
                 approval_document = (
                     active_document
@@ -5870,6 +5891,7 @@ async def stream_agent_loop(
                         "Exact approval required before tool start: %s",
                         block.tool_type,
                     )
+                    _audit_pre_execution(owner, session_id, block, result)
             else:
                 yield (
                     f'data: {json.dumps({"type": "tool_start", "tool": block.tool_type, "command": cmd_display, "full_command": full_command, "round": round_num})}\n\n'

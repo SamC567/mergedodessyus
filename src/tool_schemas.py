@@ -673,9 +673,17 @@ FUNCTION_TOOL_SCHEMAS = [
                 "type": "object",
                 "properties": {
                     "action": {"type": "string",
-                               "enum": ["board", "next", "plan", "add_quest", "add_campaign", "update",
-                                        "start", "complete", "drop", "reopen", "update_campaign", "history"],
-                               "description": "What to do"},
+                               "enum": ["board", "next", "today", "plan", "add_quest", "add_campaign", "update",
+                                        "start", "log_progress", "complete", "drop", "reopen", "update_campaign",
+                                        "history"],
+                               "description": "What to do. 'today' = today's missions, overdue and blocked work "
+                                              "(pass energy/minutes_available to re-plan the day). 'log_progress' = "
+                                              "record a progress note while working on a quest (no XP)."},
+                    "energy": {"type": "string", "enum": ["low", "normal", "high"], "description": "For today: user's energy"},
+                    "minutes_available": {"type": "integer", "description": "For today: minutes the user has today"},
+                    "note": {"type": "string", "description": "For log_progress: what was done or found so far"},
+                    "est_minutes": {"type": "integer", "description": "Rough time estimate in minutes"},
+                    "est_cost": {"type": "number", "description": "Rough money estimate (user's currency)"},
                     "campaign": {"type": "string", "description": "Campaign title or id. For plan/add_quest it is created if it doesn't exist."},
                     "campaign_description": {"type": "string", "description": "Why this campaign matters (used when plan/add_quest creates it)"},
                     "quests": {
@@ -691,6 +699,8 @@ FUNCTION_TOOL_SCHEMAS = [
                                 "due_date": {"type": "string", "description": "Only if the user gave a deadline. YYYY-MM-DD or natural language"},
                                 "is_boss": {"type": "boolean", "description": "Big milestone or hard challenge (x3 XP)"},
                                 "notes": {"type": "string"},
+                                "est_minutes": {"type": "integer", "description": "Rough time estimate in minutes"},
+                                "est_cost": {"type": "number", "description": "Rough cost, only if the step costs money"},
                                 "after": {"type": "array", "items": {"type": "string"},
                                           "description": "Titles (from this plan or existing) that must be done first"}
                             },
@@ -715,6 +725,48 @@ FUNCTION_TOOL_SCHEMAS = [
                 },
                 "required": ["action"]
             }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "manage_ledger",
+            "description": (
+                "The Life Ledger: Sam's reviewed long-term memory of decisions, preferences and important facts. "
+                "action='propose' adds a CANDIDATE that Sam must approve in the Review Inbox - use it when Sam states "
+                "a decision, a lasting preference or an important fact worth keeping (not passing remarks). "
+                "action='search' returns approved entries only. You cannot approve, edit or delete entries."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["propose", "search"]},
+                    "text": {"type": "string", "description": "For propose: one clear, self-contained statement"},
+                    "kind": {"type": "string", "enum": ["fact", "decision", "preference", "reminder", "inference"],
+                             "description": "Use 'inference' if Sam didn't say it directly"},
+                    "confidence": {"type": "string", "enum": ["low", "medium", "high"]},
+                    "source_ref": {"type": "string", "description": "Where it came from (e.g. 'chat 23 Oct', a URL)"},
+                    "campaign": {"type": "string", "description": "Related campaign title, if any"},
+                    "quest": {"type": "string", "description": "Related quest title, if any"},
+                    "relevant_until": {"type": "string", "description": "YYYY-MM-DD for temporary details"},
+                    "supersedes": {"type": "string", "description": "Text of an older approved entry this replaces"},
+                    "query": {"type": "string", "description": "For search"},
+                    "limit": {"type": "integer"}
+                },
+                "required": ["action"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "system_status",
+            "description": (
+                "Jarvis status report: local model server (latency, model, context size, busy slots), "
+                "ChromaDB, RAM, disk and GPU memory. Read-only. Use for 'status report', 'how's the server', "
+                "'is the model up', 'how much RAM is free'."
+            ),
+            "parameters": {"type": "object", "properties": {}, "required": []}
         }
     },
     {

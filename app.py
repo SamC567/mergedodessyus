@@ -862,6 +862,10 @@ app.include_router(setup_note_routes(task_scheduler, upload_handler=upload_handl
 from routes.quests.quest_routes import setup_quest_routes
 app.include_router(setup_quest_routes())
 
+# JARVIS command centre, Life Ledger, resources, action history, health
+from routes.jarvis.jarvis_routes import setup_jarvis_routes
+app.include_router(setup_jarvis_routes())
+
 # Email
 from routes.email_routes import setup_email_routes
 email_router = setup_email_routes()
@@ -916,6 +920,18 @@ async def serve_calendar(request: Request):
 @app.get("/quests")
 async def serve_quests(request: Request):
     return serve_html_with_nonce(request, abs_join(BASE_DIR, "static/quests.html"))
+
+@app.get("/jarvis")
+async def serve_jarvis(request: Request):
+    return serve_html_with_nonce(request, abs_join(BASE_DIR, "static/jarvis.html"))
+
+@app.get("/ledger")
+async def serve_ledger(request: Request):
+    return serve_html_with_nonce(request, abs_join(BASE_DIR, "static/ledger.html"))
+
+@app.get("/actions")
+async def serve_actions(request: Request):
+    return serve_html_with_nonce(request, abs_join(BASE_DIR, "static/actions.html"))
 
 # Per-tool deep-link routes — all serve the same SPA, the JS auto-opens
 # the matching modal based on window.location.pathname. Each route also

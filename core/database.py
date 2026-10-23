@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from urllib.parse import unquote, urlparse
-from sqlalchemy import DDL, event, create_engine, Column, String, Text, Boolean, DateTime, Integer, ForeignKey, JSON, Index, func, inspect, text
+from sqlalchemy import DDL, event, create_engine, Column, String, Text, Boolean, DateTime, Integer, Float, ForeignKey, JSON, Index, func, inspect, text
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
@@ -1204,6 +1204,30 @@ def _migrate_add_pinned_models_column():
         except Exception:
             pass
 
+def _migrate_add_quest_columns():
+    """Add estimate and agent-session columns to quests if they don't exist."""
+    import sqlite3
+    db_path = DATABASE_URL.replace("sqlite:///", "")
+    if not os.path.exists(db_path):
+        return
+    conn = None
+    try:
+        conn = sqlite3.connect(db_path)
+        columns = [row[1] for row in conn.execute("PRAGMA table_info(quests)").fetchall()]
+        if columns and "est_minutes" not in columns:
+            conn.execute("ALTER TABLE quests ADD COLUMN est_minutes INTEGER")
+        if columns and "est_cost" not in columns:
+            conn.execute("ALTER TABLE quests ADD COLUMN est_cost FLOAT")
+        if columns and "agent_session_id" not in columns:
+            conn.execute("ALTER TABLE quests ADD COLUMN agent_session_id TEXT")
+        conn.commit()
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"quest columns migration: {e}")
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 def _migrate_add_notes_sort_order():
     """Add sort_order, image_url, repeat columns to notes if they don't exist."""
     import sqlite3
@@ -1870,6 +1894,9 @@ class Quest(TimestampMixin, Base):
     is_boss      = Column(Boolean, default=False)
     outcome      = Column(Text, nullable=True)       # what actually changed, required to complete
     completed_at = Column(DateTime, nullable=True)
+    est_minutes  = Column(Integer, nullable=True)    # rough time estimate, used to fit daily missions
+    est_cost     = Column(Float, nullable=True)      # rough money estimate, checked against budgets
+    agent_session_id = Column(String, nullable=True) # chat where Jarvis last worked on this quest
 
 
 class QuestEvent(Base):
@@ -1884,6 +1911,78 @@ class QuestEvent(Base):
     detail      = Column(Text, nullable=True)
     skill       = Column(String, nullable=True)
     xp_delta    = Column(Integer, default=0)
+    created_at  = Column(DateTime, default=utcnow_naive, nullable=False, index=True)
+
+
+class DailyPlan(TimestampMixin, Base):
+    """One row per owner per day: energy, time available and chosen missions."""
+    __tablename__ = "daily_plans"
+
+    id                = Column(String, primary_key=True, index=True)
+    owner             = Column(String, nullable=True, index=True)
+    day               = Column(String, nullable=False, index=True)  # YYYY-MM-DD
+    energy            = Column(String, default="normal")            # low, normal, high
+    minutes_available = Column(Integer, nullable=True)
+    missions          = Column(Text, nullable=True)                 # JSON list of quest ids
+
+
+class LedgerEntry(TimestampMixin, Base):
+    """A reviewed long-term memory (Life Ledger).
+
+    Jarvis can only create entries as 'pending'; approving, rejecting,
+    editing and superseding happen through the review UI, so the AI never
+    approves its own proposals.
+    """
+    __tablename__ = "ledger_entries"
+
+    id               = Column(String, primary_key=True, index=True)
+    owner            = Column(String, nullable=True, index=True)
+    kind             = Column(String, default="fact")    # fact, decision, preference, reminder, inference
+    text             = Column(Text, nullable=False)
+    status           = Column(String, default="pending", index=True)  # pending, approved, rejected, superseded
+    source           = Column(String, default="user")    # user, jarvis, research, import
+    source_ref       = Column(Text, nullable=True)       # chat id, URL or note on where it came from
+    confidence       = Column(String, default="medium")  # low, medium, high
+    campaign_id      = Column(String, nullable=True)
+    quest_id         = Column(String, nullable=True)
+    relevant_until   = Column(String, nullable=True)     # YYYY-MM-DD for temporary details
+    supersedes_id    = Column(String, nullable=True)
+    superseded_by_id = Column(String, nullable=True)
+    reviewed_at      = Column(DateTime, nullable=True)
+
+
+class LifeResource(TimestampMixin, Base):
+    """Budgets, savings targets, owned equipment and weekly time."""
+    __tablename__ = "life_resources"
+
+    id          = Column(String, primary_key=True, index=True)
+    owner       = Column(String, nullable=True, index=True)
+    kind        = Column(String, nullable=False)   # budget, savings, equipment, time
+    name        = Column(String, nullable=False)
+    amount      = Column(Float, nullable=True)     # money for budget/savings, hours/week for time
+    target      = Column(Float, nullable=True)     # savings goal
+    unit        = Column(String, nullable=True)    # EUR, hours/week, ...
+    notes       = Column(Text, nullable=True)
+    campaign_id = Column(String, nullable=True)
+
+
+class ActionLog(Base):
+    """Append-only record of every agent tool call and its result.
+
+    Written by tool_execution for all tools; there is no API or tool that
+    updates or deletes rows, so Jarvis cannot rewrite its own history.
+    """
+    __tablename__ = "action_log"
+
+    id          = Column(String, primary_key=True, index=True)
+    owner       = Column(String, nullable=True, index=True)
+    session_id  = Column(String, nullable=True, index=True)
+    tool        = Column(String, nullable=False, index=True)
+    action      = Column(String, nullable=True)
+    summary     = Column(Text, nullable=True)      # redacted, truncated arguments
+    status      = Column(String, nullable=False)   # ok, error, blocked, approval_required
+    detail      = Column(Text, nullable=True)      # error or short result note
+    duration_ms = Column(Integer, nullable=True)
     created_at  = Column(DateTime, default=utcnow_naive, nullable=False, index=True)
 
 
@@ -2156,6 +2255,7 @@ def init_db():
     _migrate_add_cached_models_column()
     _migrate_add_pinned_models_column()
     _migrate_add_notes_sort_order()
+    _migrate_add_quest_columns()
     _migrate_add_model_type_column()
     _migrate_add_model_endpoint_refresh_columns()
     _migrate_add_model_endpoint_owner_column()

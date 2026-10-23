@@ -1,0 +1,101 @@
+/* Shared styles for the JARVIS pages (command centre, ledger, actions).
+   Colours come from the user's Odysseus theme via jarvis-common.js. */
+:root {
+  --bg: #282c34; --fg: #9cdef2; --panel: #111111; --border: #355a66; --red: #e06c75;
+  --muted: color-mix(in srgb, var(--fg) 55%, transparent);
+  --soft: color-mix(in srgb, var(--fg) 8%, transparent);
+  --accent: var(--red);
+  --warn: #e5c07b;
+  --bad: #e06c75;
+  --font: var(--font-family, ui-monospace, "Cascadia Code", Consolas, monospace);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button {
+  background: var(--soft); border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 10px; cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+button.ghost { background: transparent; border-color: transparent; color: var(--muted); padding: 3px 6px; }
+button.ghost:hover { color: var(--fg); border-color: var(--border); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+input, select, textarea {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+}
+textarea { width: 100%; min-height: 60px; resize: vertical; }
+
+.wrap { max-width: 1150px; margin: 0 auto; padding: 16px; }
+header.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+header.top h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+.back, .nav a { text-decoration: none; color: var(--muted); }
+.back:hover, .nav a:hover { color: var(--fg); }
+.nav { display: flex; gap: 14px; flex-wrap: wrap; }
+.nav a.active { color: var(--fg); border-bottom: 1px solid var(--accent); }
+.spacer { flex: 1; }
+.pill { font-size: 11px; border-radius: 999px; padding: 0 7px; background: var(--accent); color: var(--bg); font-weight: 700; }
+
+.level { display: flex; align-items: center; gap: 10px; min-width: 240px; }
+.badge { border: 1px solid var(--accent); color: var(--accent); border-radius: 999px; padding: 2px 10px; font-weight: 700; white-space: nowrap; }
+.bar { flex: 1; height: 8px; background: var(--soft); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
+.bar > span { display: block; height: 100%; background: var(--accent); width: 0; transition: width .4s ease; }
+.xp-text { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+section { margin-bottom: 20px; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.cols { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; align-items: start; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.empty { color: var(--muted); padding: 4px 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--soft); border: 1px solid var(--border); color: var(--muted); }
+.chip.hot { color: var(--accent); border-color: var(--accent); }
+.state { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+.state.ready, .state.ok { color: var(--accent); border-color: var(--accent); }
+.state.in_progress { color: var(--warn); border-color: var(--warn); }
+.state.locked, .state.blocked, .state.approval_required { color: var(--muted); }
+.state.done { color: var(--muted); text-decoration: line-through; }
+.state.error, .state.bad { color: var(--bad); border-color: var(--bad); }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.list > li { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 8px; border: 1px solid transparent; }
+.list > li:hover { border-color: var(--border); background: var(--soft); }
+.num { font-weight: 700; color: var(--accent); min-width: 22px; }
+.grow { flex: 1; min-width: 0; word-break: break-word; }
+.title { font-weight: 600; }
+.recommend { border-left: 3px solid var(--accent); }
+.recommend .big { font-size: 17px; font-weight: 700; margin: 4px 0; }
+.ok-text { color: var(--accent); }
+.bad-text { color: var(--bad); }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px dashed var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 400; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
+td.mono { word-break: break-all; color: var(--muted); }
+html, body { overflow-x: hidden; }
+details summary { cursor: pointer; color: var(--muted); }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+label.inline { flex-direction: row; align-items: center; gap: 6px; }
+.card { border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.card.pending { border-left: 3px solid var(--accent); }
+.conflict { font-size: 12px; color: var(--warn); }
+
+#toast {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 14px;
+  display: none; max-width: calc(100vw - 32px); z-index: 10;
+}
+#toast.err { border-color: var(--bad); color: var(--bad); }
+
+@media (max-width: 800px) {
+  .cols { grid-template-columns: 1fr; }
+  .level { min-width: 0; width: 100%; }
+  .grid { grid-template-columns: 1fr; }
+  table { font-size: 11px; }
+}

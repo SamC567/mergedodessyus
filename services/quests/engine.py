@@ -77,6 +77,7 @@ class QuestView:
     is_boss: bool = False
     campaign_id: Optional[str] = None
     created_order: int = 0
+    est_minutes: Optional[int] = None
 
 
 def blockers(quest: QuestView, by_id: Dict[str, QuestView]) -> List[QuestView]:
@@ -185,3 +186,80 @@ def recommend(
 
     ranked.sort(key=lambda item: item[:3])
     return [item[3] for item in ranked[:limit]]
+
+
+# Fallback time estimates by effort when a quest has none.
+DEFAULT_MINUTES = {1: 30, 2: 90, 3: 240}
+ENERGY_LEVELS = ("low", "normal", "high")
+
+
+def minutes_for(quest: QuestView) -> int:
+    if quest.est_minutes:
+        return int(quest.est_minutes)
+    return DEFAULT_MINUTES[clamp_scale(quest.effort)]
+
+
+def pick_missions(
+    quests: Sequence[QuestView],
+    inactive_campaigns: Iterable[str] = (),
+    minutes: Optional[int] = None,
+    energy: str = "normal",
+    today: Optional[date] = None,
+    limit: int = 3,
+) -> List[Dict]:
+    """Choose today's missions: best-ranked work that fits time and energy.
+
+    - Low energy skips large quests unless they are overdue or due today.
+    - Quests are taken in ranked order while they fit the time budget; if
+      nothing fits, the single best quest is still offered (flagged).
+    - Remaining slots may hold a quest whose only blockers are earlier
+      missions, shown as 'locked' so the day reads as a sequence.
+    """
+    today = today or date.today()
+    energy = energy if energy in ENERGY_LEVELS else "normal"
+    by_id = {q.id: q for q in quests}
+    ranked = recommend(quests, inactive_campaigns=inactive_campaigns, today=today, limit=len(quests) or 1)
+
+    def urgent(q: QuestView) -> bool:
+        due = parse_day(q.due_date)
+        return due is not None and due <= today
+
+    picked: List[Dict] = []
+    used = 0
+    for rec in ranked:
+        q = by_id[rec["quest_id"]]
+        if energy == "low" and clamp_scale(q.effort) == 3 and not urgent(q):
+            continue
+        cost = minutes_for(q)
+        if minutes is not None and used + cost > minutes:
+            continue
+        picked.append({**rec, "est_minutes": cost, "state": "ready", "fits": True})
+        used += cost
+        if len(picked) >= limit:
+            break
+
+    if not picked and ranked:
+        q = by_id[ranked[0]["quest_id"]]
+        picked.append({**ranked[0], "est_minutes": minutes_for(q), "state": "ready", "fits": False})
+        used = minutes_for(q)
+
+    if len(picked) < limit:
+        chosen = {m["quest_id"] for m in picked}
+        inactive = set(inactive_campaigns)
+        for q in quests:
+            if len(picked) >= limit:
+                break
+            if q.id in chosen or q.status not in OPEN_STATUSES or (q.campaign_id in inactive):
+                continue
+            open_deps = [b.id for b in blockers(q, by_id)]
+            if not open_deps or not set(open_deps) <= chosen:
+                continue
+            cost = minutes_for(q)
+            if minutes is not None and used + cost > minutes:
+                continue
+            picked.append({"quest_id": q.id, "title": q.title, "score": 0,
+                           "reasons": ["unlocks after an earlier mission"],
+                           "est_minutes": cost, "state": "locked", "fits": True})
+            chosen.add(q.id)
+            used += cost
+    return picked
