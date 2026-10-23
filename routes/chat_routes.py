@@ -1504,7 +1504,7 @@ def setup_chat_routes(
                 "read_file", "write_file", "edit_file",
                 "create_document", "edit_document", "update_document",
                 "send_email", "reply_to_email",
-                "manage_notes", "manage_calendar", "manage_tasks",
+                "manage_notes", "manage_calendar", "manage_tasks", "manage_quests",
                 "api_call",
             })
             if _search_enabled:

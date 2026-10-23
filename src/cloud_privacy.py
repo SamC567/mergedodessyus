@@ -32,6 +32,8 @@ PRIVATE_DATA_TOOL_NAMES = frozenset({
     # personal documents, notes, calendar, contacts, tasks
     "manage_documents", "manage_notes", "manage_calendar", "manage_tasks",
     "manage_contact", "resolve_contact",
+    # life plans, goals and progress history
+    "manage_quests",
     # email
     "read_email", "list_emails", "search_emails", "list_email_accounts",
     "download_attachment", "draft_email", "draft_email_reply",

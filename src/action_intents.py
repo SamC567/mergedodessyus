@@ -46,6 +46,28 @@ _PANEL = (
     r"settings|cookbook|sessions?|chats?|skills|memories|memory|brain)"
 )
 
+# Life-planning talk that should reach the manage_quests tool. Shared by the
+# chat->agent promotion below and the agent loop's domain detection
+# (is_quest_intent) so the two can't disagree.
+_QUEST_PATTERNS: tuple[tuple[str, str], ...] = (
+    ("quest log mention", r"\b(?:quests?|quest\s+log|campaigns?|xp|level\s+up)\b"),
+    ("what to do next question", r"\bwhat\s+should\s+i\s+(?:do|work\s+on|focus\s+on|tackle|start\s+with)\b"),
+    ("planning request", rf"{_PLEASE}(?:help\s+me\s+)?(?:plan|break\s+down|map\s+out)\b.{{0,120}}\b(?:goals?|projects?|plans?|week|month|year|career|life|build|upgrade|learn)"),
+    ("assistant planning request", rf"{_ACTION_QUESTION}(?:help\s+me\s+)?(?:plan|break\s+down|map\s+out|organi[sz]e)\b"),
+    ("plan-it-out request", r"\b(?:plan|break|map)\s+(?:that|this|it|them|everything)\s+(?:out|down)\b|\bhelp\s+me\s+plan\b"),
+    ("goal statement", r"\b(?:my\s+(?:main\s+|big\s+|next\s+)?goals?\s+(?:is|are|for)|i\s+want\s+to\s+(?:build|learn|get\s+better|become|start|finish|upgrade|save\s+up))\b"),
+    ("progress report", r"\bi(?:'ve|\s+have)?\s+(?:just\s+)?(?:finished|completed)\b"),
+)
+_QUEST_RES: tuple[Pattern[str], ...] = tuple(re.compile(p, re.I) for _, p in _QUEST_PATTERNS)
+
+
+def is_quest_intent(text: str) -> bool:
+    """True when a message is about goals, plans, quests or reported progress."""
+    if not text or _EXPLANATORY_PREFIX.search(text):
+        return False
+    return any(p.search(text) for p in _QUEST_RES)
+
+
 _ROUTING_PATTERNS: tuple[tuple[str, str, Pattern[str]], ...] = tuple(
     (category, reason, re.compile(pattern, re.I))
     for category, reason, pattern in (
@@ -109,6 +131,11 @@ _ROUTING_PATTERNS: tuple[tuple[str, str, Pattern[str]], ...] = tuple(
         ("web", "conversion-rate lookup request", r"\b(?:convert|conversion|exchange)\b.{0,120}\b(?:rate|rates|currency|currencies|price|prices)\b"),
         ("research", "deep research imperative request", rf"{_PLEASE}(?:research|deep\s+dive|look\s+into|investigate)\s+.+"),
         ("research", "assistant deep research request", rf"{_ACTION_QUESTION}(?:research|do\s+research|deep\s+dive|look\s+into|investigate)\s+.+"),
+
+        # Quest log / life planning (see _QUEST_PATTERNS). Listed before
+        # workspace so "plan my project" reaches manage_quests, not the coding
+        # workspace.
+        *(("quests", reason, pattern) for reason, pattern in _QUEST_PATTERNS),
 
         # Workspace / coding-agent intent. These should promote to the agent
         # workspace with shell/file tools available, not the "light" typed-tool

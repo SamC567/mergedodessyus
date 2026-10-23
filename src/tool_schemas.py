@@ -659,6 +659,67 @@ FUNCTION_TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "manage_quests",
+            "description": (
+                "The user's life/project planner, run like an RPG: campaigns are big goals, quests are concrete steps, "
+                "XP is earned only for real outcomes. The user rarely types quests themselves - YOU create them from conversation. "
+                "Check action='board' first, then action='plan' creates a campaign (or reuses one with that name) plus several "
+                "quests in one call, skipping ones already on the board; chain sequential steps with 'after'. "
+                "action='next' says what to do next and why. "
+                "action='complete' only when the user says something is done; 'outcome' restates what actually changed. "
+                "There is no delete; use 'drop' (reversible)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string",
+                               "enum": ["board", "next", "plan", "add_quest", "add_campaign", "update",
+                                        "start", "complete", "drop", "reopen", "update_campaign", "history"],
+                               "description": "What to do"},
+                    "campaign": {"type": "string", "description": "Campaign title or id. For plan/add_quest it is created if it doesn't exist."},
+                    "campaign_description": {"type": "string", "description": "Why this campaign matters (used when plan/add_quest creates it)"},
+                    "quests": {
+                        "type": "array",
+                        "description": "For action='plan': quests to add, in order.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string", "description": "Concrete, verifiable step starting with a verb, e.g. 'Order 2x32GB DDR4-3200'"},
+                                "effort": {"type": "string", "enum": ["small", "medium", "large"]},
+                                "impact": {"type": "string", "enum": ["low", "medium", "high"]},
+                                "skill": {"type": "string", "description": "Skill this levels, e.g. 'hardware', 'programming'"},
+                                "due_date": {"type": "string", "description": "Only if the user gave a deadline. YYYY-MM-DD or natural language"},
+                                "is_boss": {"type": "boolean", "description": "Big milestone or hard challenge (x3 XP)"},
+                                "notes": {"type": "string"},
+                                "after": {"type": "array", "items": {"type": "string"},
+                                          "description": "Titles (from this plan or existing) that must be done first"}
+                            },
+                            "required": ["title"]
+                        }
+                    },
+                    "quest": {"type": "string", "description": "Quest title or id, for update/start/complete/drop/reopen"},
+                    "title": {"type": "string", "description": "Title for add_quest/add_campaign"},
+                    "new_title": {"type": "string", "description": "For update: rename the quest"},
+                    "outcome": {"type": "string", "description": "For complete: what the user said actually changed. Required."},
+                    "effort": {"type": "string", "enum": ["small", "medium", "large"]},
+                    "impact": {"type": "string", "enum": ["low", "medium", "high"]},
+                    "skill": {"type": "string"},
+                    "due_date": {"type": "string"},
+                    "is_boss": {"type": "boolean"},
+                    "notes": {"type": "string"},
+                    "after": {"type": "array", "items": {"type": "string"}, "description": "Prerequisite quest titles or ids"},
+                    "status": {"type": "string", "enum": ["active", "paused", "done"], "description": "For update_campaign"},
+                    "description": {"type": "string", "description": "For add_campaign/update_campaign"},
+                    "include_finished": {"type": "boolean", "description": "For board: also list finished quests"},
+                    "limit": {"type": "integer", "description": "For history"}
+                },
+                "required": ["action"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "api_call",
             "description": "Call a registered API integration (RSS reader, git forge, bookmark manager, smart home, etc.). Check the system context for available integrations and their endpoints.",
             "parameters": {

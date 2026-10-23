@@ -564,6 +564,16 @@ _DOMAIN_RULES = {
 - Downloads/serves run on a Cookbook server; pass the named `host` when the user names one.
 - Do not launch model servers manually with bash/ssh/tmux. Use `serve_model`/`serve_preset` so the UI can track and stop them.
 - After a successful serve, verify with `list_served_models`; if an external server is running but invisible, use `adopt_served_model`.""",
+    "quests": """\
+## Quest log (life planning) rules
+- The user runs life and projects as an RPG: campaigns are big goals, quests are concrete steps. They rarely add quests by hand - you do it with `manage_quests`.
+- When the user describes a goal, project or plan: first call `manage_quests` action=board to see what already exists, then call action=plan ONCE. Put the quests in an existing campaign when one fits instead of starting a near-duplicate, and don't re-add steps that are already on the board.
+- A plan has 3-7 concrete, verifiable quests: titles start with a verb, set effort/impact/skill, set due_date only if the user gave one. Chain sequential steps with `after` (e.g. "Install RAM" after "Buy RAM"; "Benchmark" after "Install"), using titles from this plan or the board.
+- "What should I do next/today?" -> action=next, then give the top pick and the reason in a sentence or two.
+- action=complete only when the user says it's done; `outcome` restates what they said actually changed. Never complete quests on your own judgement or to hand out XP.
+- Don't invent progress, deadlines or facts about the user. If a goal is too vague to break down, ask one short question instead.
+- Prefer drop (reversible); you cannot delete quests.
+- After a plan, reply with a short summary, not the whole tool output.""",
     "notes_calendar_tasks": """\
 ## Notes/calendar/tasks rules
 - Notes/todos/reminders use `manage_notes`, not memory.
@@ -604,6 +614,7 @@ _DOMAIN_TOOL_MAP = {
     "email": {"list_email_accounts", "list_emails", "read_email", "scan_email_unsubscribes", "unsubscribe_email", "send_email", "reply_to_email", "bulk_email", "archive_email", "delete_email", "mark_email_read", "resolve_contact", "manage_contact"},
     "cookbook": {"download_model", "serve_model", "serve_preset", "list_serve_presets", "list_served_models", "stop_served_model", "tail_serve_output", "list_downloads", "cancel_download", "search_hf_models", "list_cached_models", "list_cookbook_servers", "adopt_served_model"},
     "notes_calendar_tasks": {"manage_notes", "manage_calendar", "manage_tasks"},
+    "quests": {"manage_quests"},
     "ui": {"ui_control"},
     "sessions": {"create_session", "list_sessions", "manage_session", "send_to_session", "search_chats"},
     "files": {"bash", "python", "read_file", "write_file", "edit_file", "apply_patch", "todowrite", "grep", "glob", "ls", "get_workspace", "manage_bg_jobs"},
@@ -1497,6 +1508,9 @@ def _classify_agent_request(messages: List[Dict], last_user: str) -> Dict[str, o
         domains.add("notes_calendar_tasks")
     if has(r"\b(calendar|event|meeting|appointment|schedule)\b"):
         domains.add("notes_calendar_tasks")
+    from src.action_intents import is_quest_intent
+    if is_quest_intent(retrieval_query) or has(r"\b(milestones?|roadmap|goals?|priorit\w*|next steps?)\b"):
+        domains.add("quests")
     _code_write_intent = has(
         r"\b(?:python|javascript|typescript|java|c\+\+|cpp|c#|csharp|rust|go|golang|"
         r"ruby|php|swift|kotlin|bash|shell|html|css|sql)\b",

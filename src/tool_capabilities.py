@@ -146,6 +146,7 @@ _register(
         "manage_documents",
         "manage_memory",
         "manage_notes",
+        "manage_quests",
         "manage_research",
         "manage_session",
         "manage_skills",
@@ -319,6 +320,7 @@ _PRIVATE_ACTION_READS: Mapping[str, frozenset[str]] = MappingProxyType(
         "manage_documents": frozenset({"list", "read", "view", "open", "get"}),
         "manage_memory": frozenset({"list", "search"}),
         "manage_notes": frozenset({"list", "search", "find", "view"}),
+        "manage_quests": frozenset({"board", "next", "history"}),
         "manage_research": frozenset({"list", "read", "open", "view", "get"}),
         "manage_session": frozenset({"list", "switch", "open", "select", "view"}),
         "manage_skills": frozenset({"list", "index", "view", "view_ref", "search"}),
@@ -335,6 +337,10 @@ _PRIVATE_ACTION_WRITES: Mapping[str, frozenset[str]] = MappingProxyType(
         "manage_documents": frozenset({"delete", "tidy"}),
         "manage_memory": frozenset({"add", "edit", "delete"}),
         "manage_notes": frozenset({"add", "update", "delete", "toggle_item"}),
+        "manage_quests": frozenset({
+            "plan", "add_quest", "add_campaign", "update", "start",
+            "complete", "drop", "reopen", "update_campaign",
+        }),
         "manage_research": frozenset({"delete"}),
         "manage_session": frozenset(
             {
@@ -377,6 +383,7 @@ _ACTION_DEFAULTS: Mapping[str, str] = MappingProxyType(
     {
         "manage_calendar": "list_events",
         "manage_documents": "list",
+        "manage_quests": "board",
         "manage_research": "list",
         "manage_tasks": "list",
     }
@@ -401,6 +408,23 @@ _ACTION_ALIASES: Mapping[str, Mapping[str, str]] = MappingProxyType(
                 "reminder": "add",
                 "remove": "delete",
                 "remove_item": "toggle_item",
+            }
+        ),
+        # Mirrors src/tools/quests.py::_ACTION_ALIASES so approval gating
+        # classifies exactly the action the tool will run.
+        "manage_quests": MappingProxyType(
+            {
+                "list": "board", "overview": "board", "status": "board",
+                "show": "board", "view": "board",
+                "what_next": "next", "suggest": "next", "recommend": "next",
+                "log": "history",
+                "create": "add_quest", "add": "add_quest", "new": "add_quest",
+                "create_quest": "add_quest", "new_quest": "add_quest",
+                "create_campaign": "add_campaign", "new_campaign": "add_campaign",
+                "edit": "update", "update_quest": "update", "edit_quest": "update",
+                "begin": "start", "done": "complete", "finish": "complete",
+                "abandon": "drop", "cancel": "drop", "undo": "reopen",
+                "edit_campaign": "update_campaign",
             }
         ),
     }
@@ -565,6 +589,34 @@ POST_EXTERNAL_BLOCKED_EFFECTS = frozenset(
 )
 
 
+# Narrow exceptions to the post-external gate for the quest log, which the user
+# has explicitly put Jarvis in charge of. Saved memories and the skills index
+# are injected as untrusted context in almost every chat, so without this every
+# "what should I do next?" or "plan this out" would stop for approval.
+# - Reads (board/next/history) only surface the user's own plan; every egress
+#   tool (web, email, network) stays gated, so the data cannot be sent out.
+# - Creates (plan/add_quest/add_campaign) add inert records: nothing executes,
+#   no existing row changes, no XP is earned, and each row is visible in the
+#   Quest Log and can be dropped. Injected text can at worst add a junk quest.
+# State changes (complete, drop, reopen, update, update_campaign) stay gated.
+_POST_EXTERNAL_LOW_RISK_ACTIONS: Mapping[str, frozenset[str]] = MappingProxyType(
+    {
+        "manage_quests": frozenset(
+            {"board", "next", "history", "plan", "add_quest", "add_campaign"}
+        ),
+    }
+)
+
+
+def is_post_external_low_risk(tool_name: Any, content: Any) -> bool:
+    if not isinstance(tool_name, str):
+        return False
+    allowed = _POST_EXTERNAL_LOW_RISK_ACTIONS.get(tool_name)
+    if not allowed:
+        return False
+    return _action_from_content(tool_name, content) in allowed
+
+
 @dataclass(frozen=True)
 class ToolGateDecision:
     allowed: bool
@@ -666,6 +718,8 @@ class ToolRunSecurityContext:
         if self.approval_gate_bypassed:
             return ToolGateDecision(True)
         if not self.external_untrusted_context_seen:
+            return ToolGateDecision(True)
+        if is_post_external_low_risk(tool_name, content):
             return ToolGateDecision(True)
         capabilities = capabilities_for_action(tool_name, content)
         blocked_effects = capabilities.effects & POST_EXTERNAL_BLOCKED_EFFECTS
