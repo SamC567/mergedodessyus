@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quest Log — Odysseus</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ff41' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 17.5 3 6V3h3l11.5 11.5'/%3E%3Cpath d='m13 19 6-6'/%3E%3Cpath d='m16 16 4 4'/%3E%3Cpath d='m19 21 2-2'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #282c34; --fg: #9cdef2; --panel: #111111; --border: #355a66; --red: #e06c75;
+    --muted: color-mix(in srgb, var(--fg) 55%, transparent);
+    --soft: color-mix(in srgb, var(--fg) 8%, transparent);
+    --accent: var(--red);
+    --font: var(--font-family, ui-monospace, "Cascadia Code", Consolas, monospace);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; }
+  a { color: inherit; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button {
+    background: var(--soft); border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 10px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+  button.ghost { background: transparent; border-color: transparent; color: var(--muted); padding: 3px 6px; }
+  button.ghost:hover { color: var(--fg); border-color: var(--border); }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+  }
+  input, select, textarea {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; width: 100%;
+  }
+  textarea { min-height: 70px; resize: vertical; }
+
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  header.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  header.top h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+  .back { text-decoration: none; color: var(--muted); }
+  .back:hover { color: var(--fg); }
+  .spacer { flex: 1; }
+
+  .level { display: flex; align-items: center; gap: 10px; min-width: 260px; }
+  .badge {
+    border: 1px solid var(--accent); color: var(--accent); border-radius: 999px;
+    padding: 2px 10px; font-weight: 700; white-space: nowrap;
+  }
+  .bar { flex: 1; height: 8px; background: var(--soft); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
+  .bar > span { display: block; height: 100%; background: var(--accent); width: 0; transition: width .4s ease; }
+  .xp-text { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+  section { margin-bottom: 22px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  h2 .count { font-weight: 400; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+
+  .next-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .mission { display: flex; flex-direction: column; gap: 8px; border-left: 3px solid var(--accent); }
+  .mission .title { font-weight: 600; }
+  .mission .camp-label { color: var(--muted); font-size: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--soft); border: 1px solid var(--border); color: var(--muted); }
+  .chip.hot { color: var(--accent); border-color: var(--accent); }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+  .empty { color: var(--muted); padding: 6px 2px; }
+
+  .camp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .camp-head { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+  .camp-head .name { font-weight: 700; font-size: 15px; flex: 1; word-break: break-word; }
+  .camp-meta { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .camp.paused, .camp.done { opacity: .6; }
+  .camp select.status { width: auto; padding: 2px 6px; font-size: 12px; }
+  .mini-bar { height: 4px; background: var(--soft); border-radius: 999px; overflow: hidden; margin-bottom: 10px; }
+  .mini-bar > span { display: block; height: 100%; background: var(--accent); }
+
+  ul.quests { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  ul.quests li { display: flex; align-items: center; gap: 8px; padding: 6px 6px; border-radius: 6px; }
+  ul.quests li:hover { background: var(--soft); }
+  .q-status { width: 16px; text-align: center; flex-shrink: 0; }
+  .q-main { flex: 1; min-width: 0; }
+  .q-title { cursor: pointer; word-break: break-word; }
+  .q-title:hover { text-decoration: underline; }
+  .q-sub { font-size: 11px; color: var(--muted); }
+  li.done .q-title { text-decoration: line-through; color: var(--muted); }
+  li.dropped .q-title { text-decoration: line-through; opacity: .5; }
+  li.blocked { opacity: .65; }
+  .q-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  details.finished summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+  .two-col { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+  ul.history { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow: auto; font-size: 12px; }
+  ul.history li { padding: 5px 0; border-bottom: 1px dashed var(--border); display: flex; gap: 8px; }
+  ul.history .when { color: var(--muted); white-space: nowrap; }
+  ul.history .xp { margin-left: auto; color: var(--accent); white-space: nowrap; }
+  ul.history .xp.neg { color: var(--muted); }
+  .skills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .skill { border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 12px; }
+  .skill b { color: var(--accent); }
+
+  dialog { background: var(--panel); color: var(--fg); border: 1px solid var(--border); border-radius: 12px; padding: 18px; width: min(520px, calc(100vw - 32px)); }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog h3 { margin: 0 0 12px; font-size: 16px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  label.inline { flex-direction: row; align-items: center; gap: 8px; }
+  label.inline input { width: auto; }
+  select[multiple] { min-height: 80px; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .hint { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+
+  #toast {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 14px;
+    display: none; max-width: calc(100vw - 32px); z-index: 10;
+  }
+  #toast.err { border-color: #e06c75; color: #e06c75; }
+
+  @media (max-width: 760px) {
+    .two-col { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+    .level { min-width: 0; width: 100%; }
+    .camp-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="back" href="/" title="Back to chat">◂ Odysseus</a>
+    <h1>Quest Log</h1>
+    <div class="spacer"></div>
+    <div class="level" aria-label="Level and experience">
+      <span class="badge" id="lvl">Lv 1</span>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="xp-bar"><span></span></div>
+      <span class="xp-text" id="xp-text">0 XP</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Next up <span class="count" id="done-today"></span></h2>
+    <div class="next-grid" id="next"></div>
+  </section>
+
+  <section>
+    <h2>Campaigns
+      <span class="spacer"></span>
+      <button id="new-campaign">+ Campaign</button>
+      <button class="primary" id="new-quest">+ Quest</button>
+    </h2>
+    <div class="camp-grid" id="campaigns"></div>
+  </section>
+
+  <section class="two-col">
+    <div>
+      <h2>History</h2>
+      <div class="panel"><ul class="history" id="history"></ul></div>
+    </div>
+    <div>
+      <h2>Skills</h2>
+      <div class="panel"><div class="skills" id="skills"></div></div>
+    </div>
+  </section>
+</div>
+
+<dialog id="quest-dialog">
+  <form method="dialog" id="quest-form">
+    <h3 id="quest-dialog-title">New quest</h3>
+    <div class="form-grid">
+      <label class="full">Title<input name="title" maxlength="200" required autocomplete="off"></label>
+      <label>Campaign<select name="campaign_id"></select></label>
+      <label>Due date<input name="due_date" type="date"></label>
+      <label>Impact
+        <select name="impact"><option value="1">Low</option><option value="2" selected>Medium</option><option value="3">High</option></select>
+      </label>
+      <label>Effort
+        <select name="effort"><option value="1">Small (10 XP)</option><option value="2" selected>Medium (25 XP)</option><option value="3">Large (50 XP)</option></select>
+      </label>
+      <label>Skill<input name="skill" maxlength="60" placeholder="e.g. programming" autocomplete="off" list="skill-list"></label>
+      <label class="inline"><input type="checkbox" name="is_boss"> Boss battle (×3 XP)</label>
+      <label class="full">Prerequisites (must be done first)<select name="depends_on" multiple></select></label>
+      <label class="full">Notes<textarea name="notes" maxlength="5000"></textarea></label>
+    </div>
+    <datalist id="skill-list"></datalist>
+    <div class="dialog-actions">
+      <button type="button" class="ghost" data-close>Cancel</button>
+      <button class="primary" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="complete-dialog">
+  <form method="dialog" id="complete-form">
+    <h3>Complete: <span id="complete-title"></span></h3>
+    <p class="hint">XP is for real progress. What actually changed? (e.g. "RAM installed, 64 GB detected")</p>
+    <label>Outcome<textarea name="outcome" maxlength="2000" required></textarea></label>
+    <div class="dialog-actions">
+      <button type="button" class="ghost" data-close>Cancel</button>
+      <button class="primary" value="save" id="complete-submit">Complete</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="campaign-dialog">
+  <form method="dialog" id="campaign-form">
+    <h3>New campaign</h3>
+    <p class="hint">A long-term objective, like "Build Jarvis" or "Upgrade the PC".</p>
+    <div class="form-grid">
+      <label class="full">Title<input name="title" maxlength="200" required autocomplete="off"></label>
+      <label class="full">Why it matters<textarea name="description" maxlength="5000"></textarea></label>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="ghost" data-close>Cancel</button>
+      <button class="primary" value="save">Create</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="/static/js/quests.js"></script>
+</body>
+</html>

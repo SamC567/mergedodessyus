@@ -1835,6 +1835,58 @@ class Note(TimestampMixin, Base):
     agent_session_id  = Column(String, nullable=True)
 
 
+class QuestCampaign(TimestampMixin, Base):
+    """A long-running life objective (e.g. 'Build Jarvis') grouping quests."""
+    __tablename__ = "quest_campaigns"
+
+    id          = Column(String, primary_key=True, index=True)
+    owner       = Column(String, nullable=True, index=True)
+    title       = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    status      = Column(String, default="active")   # active, paused, done
+    sort_order  = Column(Integer, default=0)
+
+
+class Quest(TimestampMixin, Base):
+    """A concrete task or milestone that advances a campaign.
+
+    XP is never stored here as a mutable score: it is derived from the
+    append-only QuestEvent log, so reopening a quest records a reversal
+    instead of rewriting history.
+    """
+    __tablename__ = "quests"
+
+    id           = Column(String, primary_key=True, index=True)
+    owner        = Column(String, nullable=True, index=True)
+    campaign_id  = Column(String, nullable=True, index=True)
+    title        = Column(String, nullable=False)
+    notes        = Column(Text, nullable=True)
+    status       = Column(String, default="todo")    # todo, doing, done, dropped
+    impact       = Column(Integer, default=2)        # 1 low .. 3 high
+    effort       = Column(Integer, default=2)        # 1 small .. 3 large
+    due_date     = Column(String, nullable=True)     # YYYY-MM-DD
+    depends_on   = Column(Text, nullable=True)       # JSON list of quest ids
+    skill        = Column(String, nullable=True)
+    is_boss      = Column(Boolean, default=False)
+    outcome      = Column(Text, nullable=True)       # what actually changed, required to complete
+    completed_at = Column(DateTime, nullable=True)
+
+
+class QuestEvent(Base):
+    """Append-only progress history. The API exposes no update/delete for it."""
+    __tablename__ = "quest_events"
+
+    id          = Column(String, primary_key=True, index=True)
+    owner       = Column(String, nullable=True, index=True)
+    quest_id    = Column(String, nullable=True, index=True)
+    campaign_id = Column(String, nullable=True)
+    kind        = Column(String, nullable=False)     # created, started, completed, reopened, dropped
+    detail      = Column(Text, nullable=True)
+    skill       = Column(String, nullable=True)
+    xp_delta    = Column(Integer, default=0)
+    created_at  = Column(DateTime, default=utcnow_naive, nullable=False, index=True)
+
+
 class CalendarCal(TimestampMixin, Base):
     """A calendar (e.g. 'Personal', 'TimeTree')."""
     __tablename__ = "calendars"

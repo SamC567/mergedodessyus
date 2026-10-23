@@ -858,6 +858,10 @@ logger.info("Webhook & API token routes initialized")
 from routes.note.note_routes import setup_note_routes
 app.include_router(setup_note_routes(task_scheduler, upload_handler=upload_handler))
 
+# Quest log (JARVIS campaigns / quests / XP)
+from routes.quests.quest_routes import setup_quest_routes
+app.include_router(setup_quest_routes())
+
 # Email
 from routes.email_routes import setup_email_routes
 email_router = setup_email_routes()
@@ -908,6 +912,10 @@ async def serve_notes(request: Request):
 @app.get("/calendar")
 async def serve_calendar(request: Request):
     return await serve_index(request)
+
+@app.get("/quests")
+async def serve_quests(request: Request):
+    return serve_html_with_nonce(request, abs_join(BASE_DIR, "static/quests.html"))
 
 # Per-tool deep-link routes — all serve the same SPA, the JS auto-opens
 # the matching modal based on window.location.pathname. Each route also
