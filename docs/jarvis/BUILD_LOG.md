@@ -100,3 +100,10 @@ Branches: `local/llama-chroma-ddg-setup` (local stack), `feature/jarvis-quest-lo
   flagged the overlapping Build Jarvis quests. A "search your memory" request
   was answered from auto-recalled memories without calling the tool, so the
   no-prompt memory search path was NOT exercised live (unit-tested only).
+
+### T5. Local dev is now the quest version
+- `dev` fast-forwarded 2992bf6d -> 9cea8b13 (dev was a direct ancestor; no
+  rewrite). `dev` is 8 commits ahead of origin/dev. NOT pushed: the only remote
+  is the public upstream odysseus-dev/odysseus; awaiting a private repo URL.
+- Checks on dev: quest + cloud-privacy tests 48 passed; app /quests 302 (login
+  redirect), llama-server n_ctx 16384, Chroma heartbeat 200.
