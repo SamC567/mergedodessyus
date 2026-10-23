@@ -1,24 +1,26 @@
 #Requires -Version 5.1
 <#
   Bring up the whole local Odysseus stack with one command:
-    1. llama-server (gpt-oss-20b, Vulkan)  -> http://127.0.0.1:8080
-    2. ChromaDB server                      -> http://127.0.0.1:8100
-    3. Odysseus (launch-windows.ps1)        -> http://127.0.0.1:7000  (foreground; Ctrl+C stops the app only)
+    1. llama-server (Qwen3.6-35B-A3B by default, Vulkan) -> http://127.0.0.1:8080
+    2. ChromaDB server                                    -> http://127.0.0.1:8100
+    3. Odysseus (launch-windows.ps1)                      -> http://127.0.0.1:7000  (foreground; Ctrl+C stops the app only)
 
   llama-server and Chroma keep running in the background; stop them with
   scripts\windows\stop-all.ps1.
 
-  Usage: powershell -ExecutionPolicy Bypass -File scripts\windows\start-all.ps1 [-CpuMoe 11]
+  Usage: powershell -ExecutionPolicy Bypass -File scripts\windows\start-all.ps1 [-Model qwen3.6|gpt-oss] [-CpuMoe N]
 #>
 param(
-    [int]$CpuMoe = 11,
+    [ValidateSet("gpt-oss", "qwen3.6")]
+    [string]$Model = "qwen3.6",
+    [int]$CpuMoe = -1,
     [int]$AppPort = 7000
 )
 
 $ErrorActionPreference = "Stop"
 $repo = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 
-& (Join-Path $PSScriptRoot "start-llama.ps1") -CpuMoe $CpuMoe
+& (Join-Path $PSScriptRoot "start-llama.ps1") -Model $Model -CpuMoe $CpuMoe
 & (Join-Path $PSScriptRoot "start-chroma.ps1")
 
 # DuckDuckGo search provider needs ddgs (optional dependency, not in requirements.txt).

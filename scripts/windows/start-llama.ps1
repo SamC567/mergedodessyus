@@ -11,17 +11,45 @@
   The --alias matches the app's default_model so the endpoint's model id is
   stable regardless of where the GGUF lives.
 
-  Usage: powershell -ExecutionPolicy Bypass -File scripts\windows\start-llama.ps1 [-CpuMoe 11] [-Foreground]
+  Usage: powershell -ExecutionPolicy Bypass -File scripts\windows\start-llama.ps1 [-Model gpt-oss|qwen3.6] [-CpuMoe N] [-Foreground]
 #>
 param(
-    [int]$CpuMoe = 11,
+    [ValidateSet("gpt-oss", "qwen3.6")]
+    [string]$Model = "qwen3.6",
+    [int]$CpuMoe = -1,
     [int]$Ctx = 16384,
     [int]$Port = 8080,
     [string]$BindHost = "127.0.0.1",
     [string]$ModelPath = "",
     [string]$LlamaExe = "",
+    [switch]$NoVision,
     [switch]$Foreground
 )
+
+# Per-model defaults. CpuMoe = how many layers keep their MoE experts in RAM;
+# tuned so weights + 16k KV cache fit the 8 GB card with ~800 MiB headroom.
+$profiles = @{
+    "gpt-oss" = @{
+        Glob   = "models--unsloth--gpt-oss-20b-GGUF\snapshots\*\gpt-oss-20b-Q4_K_M.gguf"
+        Alias  = "unsloth/gpt-oss-20b-GGUF"
+        CpuMoe = 11
+        Extra  = @()
+    }
+    "qwen3.6" = @{
+        Root   = "$env:USERPROFILE\models"
+        Glob   = "Qwen3.6-35B-A3B-GGUF\Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
+        Mmproj = "Qwen3.6-35B-A3B-GGUF\mmproj-F16.gguf"
+        Alias  = "unsloth/Qwen3.6-35B-A3B-GGUF"
+        # 34 leaves room for the vision projector: ~21 t/s gen, ~245 t/s prompt.
+        CpuMoe = 34
+        # mmap off (old flag --no-mmap): otherwise the GPU-resident weights
+        # also stay mapped in RAM, pushing a 32 GB machine into paging.
+        # Thinking off: same tool-call accuracy in tests, answers ~4x sooner.
+        Extra  = @("--load-mode", "none", "--reasoning", "off")
+    }
+}
+$prof = $profiles[$Model]
+if ($CpuMoe -lt 0) { $CpuMoe = $prof.CpuMoe }
 
 $ErrorActionPreference = "Stop"
 $repo = Resolve-Path (Join-Path $PSScriptRoot "..\..")
@@ -42,18 +70,23 @@ if (-not $LlamaExe) {
 }
 if (-not $LlamaExe -or -not (Test-Path $LlamaExe)) { throw "llama-server.exe not found. Install with: winget install ggml.llamacpp" }
 
+$hfHub = if ($prof.Root) { $prof.Root } else { "$env:USERPROFILE\.cache\huggingface\hub" }
 if (-not $ModelPath) {
-    $ModelPath = Get-ChildItem "$env:USERPROFILE\.cache\huggingface\hub\models--unsloth--gpt-oss-20b-GGUF\snapshots\*\gpt-oss-20b-Q4_K_M.gguf" -ErrorAction SilentlyContinue |
+    $ModelPath = Get-ChildItem (Join-Path $hfHub $prof.Glob) -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
 }
-if (-not $ModelPath -or -not (Test-Path $ModelPath)) { throw "gpt-oss-20b-Q4_K_M.gguf not found in the Hugging Face cache. Pass -ModelPath." }
+if (-not $ModelPath -or -not (Test-Path $ModelPath)) { throw "$Model GGUF not found in the Hugging Face cache. Pass -ModelPath." }
 
 $llamaArgs = @(
     "-m", "`"$ModelPath`"",
-    "--alias", "unsloth/gpt-oss-20b-GGUF",
+    "--alias", $prof.Alias,
     "--host", $BindHost, "--port", "$Port",
     "-c", "$Ctx", "--jinja", "-ngl", "99", "--n-cpu-moe", "$CpuMoe"
-)
+) + $prof.Extra
+if ($prof.Mmproj -and -not $NoVision) {
+    $mmproj = Get-ChildItem (Join-Path $hfHub $prof.Mmproj) -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+    if ($mmproj) { $llamaArgs += @("--mmproj", "`"$mmproj`"") }
+}
 
 if ($Foreground) { & $LlamaExe @llamaArgs; exit $LASTEXITCODE }
 
@@ -63,7 +96,7 @@ $proc = Start-Process -FilePath $LlamaExe -ArgumentList $llamaArgs -WindowStyle 
     -RedirectStandardOutput (Join-Path $logDir "llama-server.out.log") `
     -RedirectStandardError (Join-Path $logDir "llama-server.log")
 
-Write-Host "llama-server: starting (pid $($proc.Id), --n-cpu-moe $CpuMoe, -c $Ctx)..."
+Write-Host "llama-server: starting $Model (pid $($proc.Id), --n-cpu-moe $CpuMoe, -c $Ctx)..."
 for ($i = 0; $i -lt 120; $i++) {
     if ($proc.HasExited) { throw "llama-server exited (code $($proc.ExitCode)). See logs\llama-server.log" }
     try {
